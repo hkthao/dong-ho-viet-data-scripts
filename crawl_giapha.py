@@ -1,15 +1,30 @@
 import requests
+from requests import Session
 import os
 import sys
 
-def _crawl_and_save_html(url: str, output_filepath: str):
+# This script uses the 'requests' library for crawling static HTML pages.
+# 'requests' is generally more lightweight and efficient for static content
+# compared to Playwright, which is better suited for dynamic, JavaScript-rendered pages.
+# For dynamic page crawling, refer to crawl_member_details.py.
+
+def _crawl_and_save_html_with_requests(session: requests.Session, url: str, output_filepath: str):
     """
-    Helper function to crawl a URL and save its HTML content to a specified file.
+    Helper function to crawl a URL and save its HTML content to a specified file using requests.Session.
     """
     try:
         print(f"Crawling URL: {url}")
-        response = requests.get(url)
+        response = session.get(url)
         response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+
+        # Explicitly set encoding to utf-8, as declared in the HTML meta tag
+        response.encoding = 'utf-8'
+
+        # Ensure the directory exists before writing the file
+        output_dir = os.path.dirname(output_filepath)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created directory: {output_dir}")
 
         with open(output_filepath, 'w', encoding='utf-8') as f:
             f.write(response.text)
@@ -31,7 +46,7 @@ def crawl_giapha_html(family_id: str):
     """
     
     # Define directories
-    family_id_dir = family_id
+    family_id_dir = os.path.join("output", family_id)
     raw_data_dir = os.path.join(family_id_dir, "raw_data")
 
     # Create directories if they don't exist
@@ -51,13 +66,11 @@ def crawl_giapha_html(family_id: str):
         "pha_he.html": f"https://vietnamgiapha.com/XemPhaHe/{family_id}/pha_he.html",
     }
 
-    for filename, url in pages_to_crawl.items():
-        if filename == "giapha.html":
-            output_filepath = os.path.join(family_id_dir, filename)
-        else:
+    with Session() as session:
+        for filename, url in pages_to_crawl.items():
             output_filepath = os.path.join(raw_data_dir, filename)
-        
-        _crawl_and_save_html(url, output_filepath)
+            
+            _crawl_and_save_html_with_requests(session, url, output_filepath)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

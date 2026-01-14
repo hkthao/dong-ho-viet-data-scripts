@@ -156,15 +156,17 @@ if __name__ == "__main__":
     
     html_input_path = sys.argv[1]
     
-    # Extract family_id from the html_input_path (e.g., "1691/giapha.html" -> "1691")
-    family_id_dir = os.path.basename(os.path.dirname(html_input_path))
+    # Extract family_id from the html_input_path (e.g., "output/1691/giapha.html" -> "1691")
+    # This assumes html_input_path will always be in the format output/{family_id}/raw_data/giapha.html
+    family_id_from_path = html_input_path.split(os.sep)[-3] # Get the third to last element
     
-    output_dir = os.path.join(family_id_dir, "data")
+    output_base_dir = os.path.join("output", family_id_from_path)
+    output_dir = os.path.join(output_base_dir, "data")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print(f"Created directory: {output_dir}")
 
-    output_filename = f"giapha_info_{family_id_dir}.json"
+    output_filename = f"giapha_info_{family_id_from_path}.json"
     output_filepath = os.path.join(output_dir, output_filename)
 
     extracted_data = extract_giapha_info(html_input_path)

@@ -22,23 +22,21 @@ def format_date(date_str):
 
 # This helper function extracts details from a specific set of rows,
 # stopping at a given header or an <hr/> tag.
-def _extract_details_from_rows(rows_soup_list, stop_on_header=None):
+def _extract_details_from_single_person_rows(rows_soup_list, stop_on_header=None):
     details = {}
     description_collected = []
     in_description_section = False
-    description_already_collected_for_this_section = False
     
     for row_index, row in enumerate(rows_soup_list):
         # Check for stop condition first (before any other processing of the row)
         if stop_on_header and stop_on_header in row.get_text(strip=True):
-            return details, '\n'.join(description_collected), rows_soup_list[row_index] # Return the exact row object
+            return details, '\n'.join(description_collected), row_index, rows_soup_list[row_index] # Return the exact row object and its index
 
         # Check for "Sự nghiệp, công đức, ghi chú" header to start description collection
         is_description_start_header = ('Sự nghiệp, công đức, ghi chú' in row.get_text(strip=True) and
                                      row.find('td', style=lambda value: value and 'font-weight:bold' in value))
         if is_description_start_header:
             in_description_section = True
-            description_already_collected_for_this_section = False # Reset flag for new description section
             continue # Skip this header row itself, next row should contain description content
         
         # Stop description collection if an <hr/> tag is found
@@ -46,18 +44,16 @@ def _extract_details_from_rows(rows_soup_list, stop_on_header=None):
             in_description_section = False # No longer in description section
             continue # Don't process this <hr> row as description content
         
-        # If we are in the description section AND haven't collected it yet, process the row as description content
-        if in_description_section and not description_already_collected_for_this_section:
+        # If we are in the description section, process the row as description content
+        if in_description_section:
             description_td = row.find('td', colspan='3')
             if description_td:
                 paragraph_texts = [p.get_text(separator=' ', strip=True) for p in description_td.find_all('p')]
                 clean_text = '\n'.join(p for p in paragraph_texts if p) # Join non-empty paragraphs with newline
                 if clean_text:
                     description_collected.append(clean_text)
-                    description_already_collected_for_this_section = True # Mark as collected
-            
-            in_description_section = False # This description section is now fully processed or skipped
-            continue # Continue to next row
+            # The description section can span multiple rows, so don't set in_description_section to False here
+            continue
 
         # Process as a regular key-value pair if not in description section and not a description header
         key_td = row.find('td', style=lambda value: value and 'font-weight:bold' in value)
@@ -68,11 +64,40 @@ def _extract_details_from_rows(rows_soup_list, stop_on_header=None):
                 value = value_td.get_text(strip=True).replace('\xa0', ' ')
                 details[key] = value
             # If a new key-value pair is found, it implicitly means any prior description section has ended.
-            in_description_section = False
-            description_already_collected_for_this_section = False # Reset for any new description sections
+            in_description_section = False # Reset in_description_section if a new key-value pair is found
             continue # Continue to next row after processing key-value pair
 
-    return details, '\n'.join(description_collected), None # Return None for remaining rows if no stop_on_header was met
+    return details, '\n'.join(description_collected), len(rows_soup_list), None # Return full length if no stop_on_header was met
+
+
+# Helper function to process a single person's raw details into a structured dictionary
+def _process_person_details(raw_details, description, key_translation_map):
+    processed_data = {}
+    if description:
+        processed_data[key_translation_map['Sự nghiệp, công đức, ghi chú']] = description
+
+    if 'Tên' in raw_details:
+        name_gender = raw_details['Tên']
+        if '(Nữ)' in name_gender:
+            processed_data[key_translation_map['Tên']] = name_gender.replace('(Nữ)', '').strip()
+            processed_data[key_translation_map['Giới tính']] = 'Female'
+        elif '(Nam)' in name_gender:
+            processed_data[key_translation_map['Tên']] = name_gender.replace('(Nam)', '').strip()
+            processed_data[key_translation_map['Giới tính']] = 'Male'
+        else:
+            processed_data[key_translation_map['Tên']] = name_gender.strip()
+            processed_data[key_translation_map['Giới tính']] = 'Unknown'
+    else:
+        processed_data[key_translation_map['Giới tính']] = 'Unknown'
+
+    # Map other fields
+    for key_vn, key_en in key_translation_map.items():
+        if key_vn in raw_details and key_vn not in ['Tên', 'Giới tính', 'Sự nghiệp, công đức, ghi chú']:
+            if key_vn in ['Ngày sinh', 'Ngày mất']:
+                processed_data[key_en] = format_date(raw_details[key_vn])
+            else:
+                processed_data[key_en] = raw_details[key_vn]
+    return processed_data
 
 def extract_family_data(html_file_path):
     with open(html_file_path, 'r', encoding='utf-8') as f:
@@ -108,14 +133,14 @@ def extract_family_data(html_file_path):
     
     # --- Find the main person's detail table ---
     person_detail_table = None
-    all_tbody_trs = detail_container_table.find('tbody').find_all('tr', recursive=False)
+    all_tbody_trs = detail_container_table.find_all('tr', recursive=False)
 
     for tr in all_tbody_trs:
         data_td = tr.find('td', recursive=False)
         if data_td:
             inner_table = data_td.find('table', recursive=False)
             if inner_table:
-                header_td = inner_table.find('tbody').find('td', style=lambda value: value and 'font-weight:bold' in value)
+                header_td = inner_table.find('td', style=lambda value: value and 'font-weight:bold' in value)
                 if header_td and header_td.get_text(strip=True) == 'Người trong gia đình':
                     person_detail_table = inner_table
                     break 
@@ -251,7 +276,7 @@ def extract_family_data(html_file_path):
     return json.dumps(family_data, ensure_ascii=False, indent=4)
 
 if __name__ == '__main__':
-    html_file = 'Viet Nam Gia Pha, Website cua toc - Chi tiet_ Cao Thị Yên.html'
+    html_file = 'sample/sample.html'
     json_output = extract_family_data(html_file)
     # print(json_output) # Suppress printing to stdout
 
