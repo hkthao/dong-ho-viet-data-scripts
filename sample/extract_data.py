@@ -1,3 +1,4 @@
+import markdown # Import the markdown library
 from bs4 import BeautifulSoup
 import json
 import re
@@ -12,6 +13,12 @@ def format_date(date_str):
         day, month, year = match_full_date.groups()
         return f"{year}-{int(month):02d}-{int(day):02d}"
     
+    # Try to parse full date DD-MM-YYYY
+    match_full_date_dash = re.match(r'(\d{1,2})-(\d{1,2})-(\d{4})', date_str)
+    if match_full_date_dash:
+        day, month, year = match_full_date_dash.groups()
+        return f"{year}-{int(month):02d}-{int(day):02d}"
+    
     # Try to parse year only YYYY
     match_year = re.match(r'(\d{4})', date_str)
     if match_year:
@@ -20,61 +27,40 @@ def format_date(date_str):
     
     return date_str # Return as is if no specific format matches or it's not a date
 
-# This helper function extracts details from a specific set of rows,
-# stopping at a given header or an <hr/> tag.
-def _extract_details_from_single_person_rows(rows_soup_list, stop_on_header=None):
+# This helper function extracts details from a specific table (converted from markdown)
+def _extract_details_from_rows(table_soup):
     details = {}
-    description_collected = []
-    in_description_section = False
     
-    for row_index, row in enumerate(rows_soup_list):
-        # Check for stop condition first (before any other processing of the row)
-        if stop_on_header and stop_on_header in row.get_text(strip=True):
-            return details, '\n'.join(description_collected), row_index, rows_soup_list[row_index] # Return the exact row object and its index
+    # Find all rows in the table body (excluding header row)
+    rows = table_soup.find_all('tr')
+    # The first row is usually the header in markdown tables, so skip it
+    if rows and rows[0].find('th'):
+        rows = rows[1:]
 
-        # Check for "Sự nghiệp, công đức, ghi chú" header to start description collection
-        is_description_start_header = ('Sự nghiệp, công đức, ghi chú' in row.get_text(strip=True) and
-                                     row.find('td', style=lambda value: value and 'font-weight:bold' in value))
-        if is_description_start_header:
-            in_description_section = True
-            continue # Skip this header row itself, next row should contain description content
-        
-        # Stop description collection if an <hr/> tag is found
-        if in_description_section and row.find('hr'):
-            in_description_section = False # No longer in description section
-            continue # Don't process this <hr> row as description content
-        
-        # If we are in the description section, process the row as description content
-        if in_description_section:
-            description_td = row.find('td', colspan='3')
-            if description_td:
-                paragraph_texts = [p.get_text(separator=' ', strip=True) for p in description_td.find_all('p')]
-                clean_text = '\n'.join(p for p in paragraph_texts if p) # Join non-empty paragraphs with newline
-                if clean_text:
-                    description_collected.append(clean_text)
-            # The description section can span multiple rows, so don't set in_description_section to False here
-            continue
-
-        # Process as a regular key-value pair if not in description section and not a description header
-        key_td = row.find('td', style=lambda value: value and 'font-weight:bold' in value)
-        if key_td:
-            key = key_td.get_text(strip=True).replace(':', '').replace('\xa0', ' ')
-            value_td = key_td.find_next_sibling('td')
-            if value_td:
-                value = value_td.get_text(strip=True).replace('\xa0', ' ')
-                details[key] = value
-            # If a new key-value pair is found, it implicitly means any prior description section has ended.
-            in_description_section = False # Reset in_description_section if a new key-value pair is found
-            continue # Continue to next row after processing key-value pair
-
-    return details, '\n'.join(description_collected), len(rows_soup_list), None # Return full length if no stop_on_header was met
+    for row in rows:
+        cells = row.find_all(['th', 'td'])
+        if len(cells) == 2:
+            key = cells[0].get_text(strip=True).replace(':', '').replace('\xa0', ' ')
+            value = cells[1].get_text(strip=True).replace('\xa0', ' ')
+            details[key] = value
+    return details
 
 
 # Helper function to process a single person's raw details into a structured dictionary
 def _process_person_details(raw_details, description, key_translation_map):
     processed_data = {}
+    
+    # Handle description combination
+    table_description_key_vn = 'Sự nghiệp, công đức, ghi chú'
+    combined_description = []
+
+    if table_description_key_vn in raw_details:
+        combined_description.append(raw_details[table_description_key_vn])
     if description:
-        processed_data[key_translation_map['Sự nghiệp, công đức, ghi chú']] = description
+        combined_description.append(description)
+    
+    if combined_description:
+        processed_data[key_translation_map[table_description_key_vn]] = '\n'.join(combined_description).strip()
 
     if 'Tên' in raw_details:
         name_gender = raw_details['Tên']
@@ -92,18 +78,21 @@ def _process_person_details(raw_details, description, key_translation_map):
 
     # Map other fields
     for key_vn, key_en in key_translation_map.items():
-        if key_vn in raw_details and key_vn not in ['Tên', 'Giới tính', 'Sự nghiệp, công đức, ghi chú']:
+        if key_vn in raw_details and key_vn not in ['Tên', 'Giới tính', table_description_key_vn]: # Exclude raw description already handled
             if key_vn in ['Ngày sinh', 'Ngày mất']:
                 processed_data[key_en] = format_date(raw_details[key_vn])
             else:
                 processed_data[key_en] = raw_details[key_vn]
     return processed_data
 
-def extract_family_data(html_file_path):
-    with open(html_file_path, 'r', encoding='utf-8') as f:
-        html_content = f.read()
+def extract_family_data(md_file_path): # Changed parameter name
+    with open(md_file_path, 'r', encoding='utf-8') as f:
+        md_content = f.read()
 
+    html_content = markdown.markdown(md_content, extensions=['tables']) # Convert markdown to HTML with table extension
+    # print("Generated HTML:\n", html_content) # For debugging
     soup = BeautifulSoup(html_content, 'html.parser')
+    # print("BeautifulSoup object:\n", soup.prettify()) # For debugging
     
     family_data = {}
 
@@ -124,132 +113,116 @@ def extract_family_data(html_file_path):
         'Nơi an táng': 'burial_place',
     }
 
-    main_content_td = soup.find('td', valign="top", width="85%", background=re.compile(r'bkbook.gif'))
-    if not main_content_td:
-        return {}
-    detail_container_table = main_content_td.find('table', align="center", width="80%")
-    if not detail_container_table:
-        return {}
+    # Find the main person's detail table by looking for the <h3> header
+    main_person_header = soup.find('h3', string=re.compile(r'Người trong gia đình'))
+    if not main_person_header:
+        print("Error: Could not find main person's detail header.")
+        return json.dumps({}, ensure_ascii=False, indent=4)
     
-    # --- Find the main person's detail table ---
-    person_detail_table = None
-    all_tbody_trs = detail_container_table.find_all('tr', recursive=False)
-
-    for tr in all_tbody_trs:
-        data_td = tr.find('td', recursive=False)
-        if data_td:
-            inner_table = data_td.find('table', recursive=False)
-            if inner_table:
-                header_td = inner_table.find('td', style=lambda value: value and 'font-weight:bold' in value)
-                if header_td and header_td.get_text(strip=True) == 'Người trong gia đình':
-                    person_detail_table = inner_table
-                    break 
-
+    person_detail_table = main_person_header.find_next_sibling('table')
     if not person_detail_table:
         print("Error: Could not find main person's detail table.")
-        return {}
+        return json.dumps({}, ensure_ascii=False, indent=4)
     
-    # --- Extract main person's details (Cao Thị Yên) ---
-    all_person_table_rows = person_detail_table.find_all('tr')
-    main_person_raw_details, main_person_description, spouse_start_row = _extract_details_from_rows(
-        all_person_table_rows, 
-        stop_on_header='Liên quan (chồng, vợ) trong gia đình'
-    )
+    # --- Extract main person's details ---
+    main_person_raw_details = _extract_details_from_rows(person_detail_table)
     
-    main_person_processed_data = {}
-    if main_person_description:
-        main_person_processed_data[key_translation_map['Sự nghiệp, công đức, ghi chú']] = main_person_description
+    # Extract description for main person (text between main person table and spouse header)
+    main_person_description_paragraphs = []
+    current_element = person_detail_table.next_sibling
+    while current_element and current_element.name != 'h3' and 'Liên quan (chồng, vợ) trong gia đình' not in current_element.get_text(strip=True) if current_element.name == 'h3' else True:
+        if current_element.name == 'p':
+            main_person_description_paragraphs.append(current_element.get_text(separator=' ', strip=True))
+        elif current_element.name == 'ul' or current_element.name == 'ol': # Handle lists in description
+            list_items = [li.get_text(separator=' ', strip=True) for li in current_element.find_all('li')]
+            main_person_description_paragraphs.append('\n'.join(list_items))
+        
+        current_element = current_element.next_sibling
+        # To avoid infinite loops on bare strings between tags
+        if isinstance(current_element, str):
+            current_element = current_element.next_sibling
+            
+    main_person_description = '\n'.join(main_person_description_paragraphs).strip()
 
-    if 'Tên' in main_person_raw_details:
-        name_gender = main_person_raw_details['Tên']
-        if '(Nữ)' in name_gender:
-            main_person_processed_data[key_translation_map['Tên']] = name_gender.replace('(Nữ)', '').strip()
-            main_person_processed_data[key_translation_map['Giới tính']] = 'Female'
-        elif '(Nam)' in name_gender:
-            main_person_processed_data[key_translation_map['Tên']] = name_gender.replace('(Nam)', '').strip()
-            main_person_processed_data[key_translation_map['Giới tính']] = 'Male'
-        else:
-            main_person_processed_data[key_translation_map['Tên']] = name_gender.strip()
-            main_person_processed_data[key_translation_map['Giới tính']] = 'Unknown'
-    else:
-        main_person_processed_data[key_translation_map['Giới tính']] = 'Unknown'
+    main_person_processed_data = _process_person_details(main_person_raw_details, main_person_description, key_translation_map)
+    
+    # Extract 'Đời thứ' (generation) and 'Là con của' (father) from <p> tags before main person header
+    current_element = main_person_header.previous_sibling
+    generation_found = False
+    father_found = False
 
-    # Map other fields for Main Person
-    for key_vn, key_en in key_translation_map.items():
-        if key_vn in main_person_raw_details and key_vn not in ['Tên', 'Giới tính', 'Sự nghiệp, công đức, ghi chú']:
-            if key_vn == 'Ngày sinh':
-                main_person_processed_data[key_en] = format_date(main_person_raw_details[key_vn])
-            else:
-                main_person_processed_data[key_en] = main_person_raw_details[key_vn]
-    
-    # Extract 'Đời thứ' (generation)
-    doi_thu_td = detail_container_table.find('td', string=re.compile(r'Đời thứ:'))
-    if doi_thu_td:
-        doi_thu_value = doi_thu_td.get_text(strip=True).split('Đời thứ:')[-1].strip()
-        main_person_processed_data[key_translation_map['Đời thứ']] = doi_thu_value
-    
-    # Extract 'Là con của' (father)
-    # Iterate through all direct trs to find the one with 'Là con của:' text
-    father_td_element = None
-    for tr in all_tbody_trs:
-        # Find all td elements within the current tr
-        td_elements = tr.find_all('td')
-        for td in td_elements:
-            if 'Là con của:' in td.get_text(strip=True):
-                father_td_element = td
-                break
-        if father_td_element:
-            break
+    while current_element and (not generation_found or not father_found):
+        if current_element.name == 'p':
+            p_text = current_element.get_text(strip=True)
+            if 'Đời thứ:' in p_text and not generation_found:
+                doi_thu_value = p_text.split('Đời thứ:')[-1].strip()
+                main_person_processed_data[key_translation_map['Đời thứ']] = doi_thu_value
+                generation_found = True
+            if 'Là con của:' in p_text and not father_found:
+                father_link = current_element.find('a')
+                if father_link:
+                    main_person_processed_data[key_translation_map['Là con của']] = {
+                        'name': father_link.get_text(strip=True),
+                        'url': father_link.get('href')
+                    }
+                else:
+                    father_name_match = re.search(r'Là con của:\s*(.+)', p_text)
+                    if father_name_match:
+                        main_person_processed_data[key_translation_map['Là con của']] = {
+                            'name': father_name_match.group(1).strip(),
+                            'url': None
+                        }
+                father_found = True
+        current_element = current_element.previous_sibling
+        # To avoid infinite loops on bare strings between tags
+        if isinstance(current_element, str):
+            current_element = current_element.previous_sibling
 
-    if father_td_element:
-        father_link = father_td_element.find('a')
-        if father_link:
-            main_person_processed_data[key_translation_map['Là con của']] = {
-                'name': father_link.get_text(strip=True),
-                'url': father_link.get('href')
-            }
-    
     family_data['main_person'] = main_person_processed_data
 
     # --- Extract spouse details ---
-    spouse_raw_details = {}
-    spouse_description = ""
-    
-    if spouse_start_row:
-        # Get all rows from spouse_start_row onwards
-        remaining_rows_for_spouse = all_person_table_rows[all_person_table_rows.index(spouse_start_row):]
-        spouse_raw_details, spouse_description, _ = _extract_details_from_rows(
-            remaining_rows_for_spouse, 
-            stop_on_header=None # No stop header for spouse's section
-        )
+    spouse_header = soup.find('h3', string=re.compile(r'Liên quan \(chồng, vợ\) trong gia đình'))
+    spouse_list = []
+    if spouse_header:
+        current_element = spouse_header.next_sibling
+        while current_element:
+            if current_element.name == 'h4': # Each spouse might be under an h4
+                spouse_name_gender = current_element.get_text(strip=True)
+                spouse_table = current_element.find_next_sibling('table')
+                if spouse_table:
+                    spouse_raw_details = _extract_details_from_rows(spouse_table)
+                    spouse_description_paragraphs = []
+                    
+                    # Collect description between spouse table and next h4 or next h3 (siblings/children/end)
+                    desc_element = spouse_table.next_sibling
+                    while desc_element and desc_element.name != 'h4' and desc_element.name != 'h3':
+                        if desc_element.name == 'p':
+                            spouse_description_paragraphs.append(desc_element.get_text(separator=' ', strip=True))
+                        elif desc_element.name == 'ul' or desc_element.name == 'ol': # Handle lists in description
+                            list_items = [li.get_text(separator=' ', strip=True) for li in desc_element.find_all('li')]
+                            spouse_description_paragraphs.append('\n'.join(list_items))
+                        desc_element = desc_element.next_sibling
+                        if isinstance(desc_element, str):
+                            desc_element = desc_element.next_sibling
 
-    spouse_processed_data = {}
-    if spouse_description:
-        spouse_processed_data[key_translation_map['Sự nghiệp, công đức, ghi chú']] = spouse_description
+                    spouse_description = '\n'.join(spouse_description_paragraphs).strip()
+                    
+                    # Add name and gender from H4 to raw details for _process_person_details to handle
+                    if 'Tên' not in spouse_raw_details:
+                        spouse_raw_details['Tên'] = spouse_name_gender
 
-    if 'Tên' in spouse_raw_details:
-        name_gender = spouse_raw_details['Tên']
-        if '(Nữ)' in name_gender:
-            spouse_processed_data[key_translation_map['Tên']] = name_gender.replace('(Nữ)', '').strip()
-            spouse_processed_data[key_translation_map['Giới tính']] = 'Female'
-        elif '(Nam)' in name_gender:
-            spouse_processed_data[key_translation_map['Tên']] = name_gender.replace('(Nam)', '').strip()
-            spouse_processed_data[key_translation_map['Giới tính']] = 'Male'
-        else:
-            spouse_processed_data[key_translation_map['Tên']] = name_gender.strip()
-            spouse_processed_data[key_translation_map['Giới tính']] = 'Unknown'
-    else:
-        spouse_processed_data[key_translation_map['Giới tính']] = 'Unknown'
-
-    # Map other fields for Spouse
-    for key_vn, key_en in key_translation_map.items():
-        if key_vn in spouse_raw_details and key_vn not in ['Tên', 'Giới tính', 'Sự nghiệp, công đức, ghi chú']:
-            if key_vn in ['Ngày sinh', 'Ngày mất']:
-                spouse_processed_data[key_en] = format_date(spouse_raw_details[key_vn])
+                    spouse_processed_data = _process_person_details(spouse_raw_details, spouse_description, key_translation_map)
+                    spouse_list.append(spouse_processed_data)
+                current_element = spouse_table.next_sibling if spouse_table else current_element.next_sibling
+                # Skip any non-tag elements that might be created by markdown
+                if isinstance(current_element, str):
+                    current_element = current_element.next_sibling
             else:
-                spouse_processed_data[key_en] = spouse_raw_details[key_vn]
+                current_element = current_element.next_sibling
+                if isinstance(current_element, str):
+                    current_element = current_element.next_sibling
 
-    family_data['spouse'] = spouse_processed_data
+    family_data['spouses'] = spouse_list # Changed 'spouse' to 'spouses' to hold a list
 
     # --- Extract children from the main person's description ---
     children_list = []
@@ -271,13 +244,68 @@ def extract_family_data(html_file_path):
             })
     family_data['children'] = children_list
 
-    family_data['siblings'] = [] 
+    # --- Extract siblings ---
+    siblings_header = soup.find('h3', string=re.compile(r'Các anh em, dâu rể'))
+    siblings_list = []
+    if siblings_header:
+        current_element = siblings_header.next_sibling
+        # Siblings are usually just listed as text or links
+        while current_element and current_element.name != 'h3': # Stop at next H3 (e.g., Children)
+            if current_element.name == 'p':
+                # Check for links or plain text names
+                links = current_element.find_all('a')
+                if links:
+                    for link in links:
+                        siblings_list.append({
+                            'name': link.get_text(strip=True),
+                            'url': link.get('href')
+                        })
+                else: # Plain text siblings
+                    text_content = current_element.get_text(strip=True)
+                    if text_content and text_content != 'Không có anh em':
+                        # Simple split for comma-separated names, need to refine if complex
+                        names = [name.strip() for name in text_content.split(',') if name.strip()]
+                        for name in names:
+                            siblings_list.append({'name': name, 'url': None})
+            
+            current_element = current_element.next_sibling
+            if isinstance(current_element, str):
+                current_element = current_element.next_sibling
+    family_data['siblings'] = siblings_list
+
+    # --- Extract children from the "Con cái" section explicitly ---
+    children_explicit_header = soup.find('h3', string=re.compile(r'Con cái'))
+    if children_explicit_header:
+        current_element = children_explicit_header.next_sibling
+        while current_element and current_element.name != 'h3':
+            if current_element.name == 'ul':
+                for li in current_element.find_all('li'):
+                    link = li.find('a')
+                    if link:
+                        child_name = link.get_text(strip=True)
+                        child_url = link.get('href')
+                        # Check if this child is already in children_list (from description)
+                        # We can merge them later or prioritize explicit list
+                        if not any(c['name'] == child_name for c in family_data['children']):
+                             family_data['children'].append({
+                                'name': child_name,
+                                'url': child_url,
+                                'details': None # Details are not explicit here
+                            })
+                    else:
+                        # Handle direct text if no link, though less likely for "Con cái"
+                        text_content = li.get_text(strip=True)
+                        if text_content and not any(c['name'] == text_content for c in family_data['children']):
+                            family_data['children'].append({'name': text_content, 'url': None, 'details': None})
+            current_element = current_element.next_sibling
+            if isinstance(current_element, str):
+                current_element = current_element.next_sibling
 
     return json.dumps(family_data, ensure_ascii=False, indent=4)
 
 if __name__ == '__main__':
-    html_file = 'sample/sample.html'
-    json_output = extract_family_data(html_file)
+    md_file = 'sample/sample.md' # Changed to markdown file
+    json_output = extract_family_data(md_file)
     # print(json_output) # Suppress printing to stdout
 
     # Write to a file

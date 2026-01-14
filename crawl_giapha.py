@@ -37,25 +37,23 @@ def _crawl_and_save_html_with_requests(session: requests.Session, url: str, outp
         print(f"An unexpected error occurred: {e}")
         return False
 
-def crawl_giapha_html(family_id: str):
+def crawl_giapha_html(family_id: str, output_giapha_html_path: str, output_base_dir_for_others: str):
     """
     Crawls multiple HTML pages for a given family ID and saves them to appropriate files.
+    giapha.html is saved to output_giapha_html_path.
+    Other related HTML files are saved to output_base_dir_for_others.
 
     Args:
         family_id (str): The ID of the family to crawl.
+        output_giapha_html_path (str): The full path where giapha.html will be saved.
+        output_base_dir_for_others (str): The base directory for other HTML files.
     """
     
-    # Define directories
-    family_id_dir = os.path.join("output", family_id)
-    raw_data_dir = os.path.join(family_id_dir, "raw_data")
-
-    # Create directories if they don't exist
-    if not os.path.exists(family_id_dir):
-        os.makedirs(family_id_dir)
-        print(f"Created directory: {family_id_dir}")
-    if not os.path.exists(raw_data_dir):
-        os.makedirs(raw_data_dir)
-        print(f"Created directory: {raw_data_dir}")
+    # Ensure the directories exist
+    os.makedirs(os.path.dirname(output_giapha_html_path), exist_ok=True)
+    os.makedirs(output_base_dir_for_others, exist_ok=True)
+    print(f"Created directory: {os.path.dirname(output_giapha_html_path)}")
+    print(f"Created directory: {output_base_dir_for_others}")
 
     # URLs to crawl and their corresponding output filenames
     pages_to_crawl = {
@@ -68,14 +66,19 @@ def crawl_giapha_html(family_id: str):
 
     with Session() as session:
         for filename, url in pages_to_crawl.items():
-            output_filepath = os.path.join(raw_data_dir, filename)
+            if filename == "giapha.html":
+                output_filepath = output_giapha_html_path
+            else:
+                output_filepath = os.path.join(output_base_dir_for_others, filename)
             
             _crawl_and_save_html_with_requests(session, url, output_filepath)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python crawl_giapha.py <family_id>")
+    if len(sys.argv) < 4:
+        print("Usage: python crawl_giapha.py <family_id> <output_giapha_html_path> <output_base_dir_for_others>")
         sys.exit(1)
     
     family_id_to_crawl = sys.argv[1]
-    crawl_giapha_html(family_id_to_crawl)
+    output_giapha_html_filepath = sys.argv[2]
+    output_base_dir_for_other_files = sys.argv[3]
+    crawl_giapha_html(family_id_to_crawl, output_giapha_html_filepath, output_base_dir_for_other_files)

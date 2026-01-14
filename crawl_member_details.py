@@ -39,13 +39,14 @@ async def _crawl_and_save_html(url: str, output_filepath: str):
         print(f"Error crawling {url} with Playwright: {e}")
         return False
 
-async def crawl_member_details(family_id: str, pha_he_html_path: str):
+async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
     """
-    Reads pha_he.html, extracts member detail URLs, crawls them, and saves to raw_data/members.
+    Reads pha_he.html, extracts member detail URLs, crawls them, and saves to members_output_dir.
 
     Args:
         family_id (str): The ID of the family.
-        pha_he_html_path (str): Path to the pha_he.html file.
+        members_output_dir (str): The directory where member HTML files will be saved.
+        pha_he_html_path (str): Path to the pha_he.html file (which contains links to members).
     """
     try:
         with open(pha_he_html_path, 'r', encoding='utf-8') as f:
@@ -61,21 +62,18 @@ async def crawl_member_details(family_id: str, pha_he_html_path: str):
 
     member_base_url = "https://vietnamgiapha.com/XemChiTietTungNguoi/"
     
-    # Target directory for member HTML files
-    members_output_dir = os.path.join("output", family_id, "raw_data", "members")
+    # Ensure the members_output_dir exists
     if not os.path.exists(members_output_dir):
         os.makedirs(members_output_dir)
         print(f"Created directory: {members_output_dir}")
 
     # Find all <a> tags that have an href containing "javascript:o("
-    # The links are typically structured as javascript:o(family_id, member_id)
     links = soup.find_all('a', href=re.compile(r'javascript:o\(\d+,\d+\)'))
 
     for link in links:
         href = link.get('href')
         match = re.search(r'o\((\d+),(\d+)\)', href)
         if match:
-            # We already have family_id, but extract it for consistency/validation
             extracted_family_id = match.group(1)
             member_id = match.group(2)
             
@@ -88,11 +86,12 @@ async def crawl_member_details(family_id: str, pha_he_html_path: str):
             await _crawl_and_save_html(member_detail_url, output_filepath)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python crawl_member_details.py <family_id> <pha_he_html_path>")
+    if len(sys.argv) < 4:
+        print("Usage: python crawl_member_details.py <family_id> <members_output_dir> <pha_he_html_path>")
         sys.exit(1)
     
     family_id_to_crawl = sys.argv[1]
-    pha_he_html_file = sys.argv[2]
+    members_output_directory = sys.argv[2]
+    pha_he_html_file = sys.argv[3]
     
-    asyncio.run(crawl_member_details(family_id_to_crawl, pha_he_html_file))
+    asyncio.run(crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file))
