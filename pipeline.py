@@ -7,7 +7,7 @@ import html2text # Import html2text for HTML to Markdown conversion
 # Define the paths for scripts
 CRAWL_GIAPHA_SCRIPT = "crawl_giapha.py"
 CRAWL_MEMBER_DETAILS_SCRIPT = "crawl_member_details.py"
-EXTRACT_GIAPHA_INFO_SCRIPT = "extract_giapha_info.py"
+EXTRACT_GIAPHA_INFO_SCRIPT = "extract_giapha_info_ollama.py"
 EXTRACT_MEMBER_INFO_SCRIPT = "extract_member_info_ollama.py"
 
 BASE_URL = "https://vietnamgiapha.com/" # Base URL for relative links
@@ -169,7 +169,7 @@ def pipeline(family_id: str):
     giapha_info_json_path = os.path.join(data_dir, f"giapha_info_{family_id}.json")
     if not check_file_exists(giapha_info_json_path, "Main Giapha Info JSON"):
         # The extract_giapha_info.py script now expects the path to giapha.md
-        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_md_path],
+        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_md_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b")],
                            f"Extracting main family info for {family_id}"):
             return False
     
