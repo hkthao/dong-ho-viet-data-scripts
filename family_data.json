@@ -1,0 +1,50 @@
+{
+    "main_person": {
+        "description": "Bà sinh năm 1933 tại Tràng Bạch, sau cùng bố mẹ về sống tại và lớn lên tại Xuân Cầu, bà làm ruộng, lấy chồng là ông Tô Nhữ (tức Nhân) ở Xuân Cầu. Bà sống dung dị, nhường nhịn và hết lòng vì chồng con.\nBà sinh được 4 người con (2 gái, 2 trai ) là :\n1- Tô Thị Quý : Sinh năm 1957, làm kế toán tại CT Than Vàng Danh, lấy chồng là Hoàng Văn Kháng người Yên Mỹ và định cư ở Uông Bí, có các con là Hoàng Thị Dung (1981), Hoàng Thị Dương (1982), Hoàng Minh Đức (1989).\n2- Tô Thị Hương: sinh năm 1960, giáo viên THCS, lấy chồng là Luyện Văn Sinh người Ngọc Long - Yên Mỹ, có các con là Luyện Trung Kiên (1984), Luyện Minh Trang (1989).\n3- Tô Mười : sinh năm 1963, công nhân lái xe, lấy vợ là Cao Thị Oánh sinh năm 1975 hiện ở tại Xuân Cầu, có 2 con trai là Tô Quốc Khánh (1997), Tô Cao Hoàng (2002)\n4- Tô Tiến Bộ : sinh năm 1971, làm việc và định cư ở CHLB Đức. Lấy vợ là Nguyễn Thị Dịu sinh năm 1980, có con là Tô Quản Thiện (2006)",
+        "name": "Cao Thị Yên",
+        "gender": "Female",
+        "nickname": "Cao Thị Tràng",
+        "alias": "",
+        "child_order": "3",
+        "dob": "1933-01-01",
+        "address": "Tam Kỳ - Xuân Cầu - Văn Giang - Hưng Yên",
+        "generation": "3",
+        "father": {
+            "name": "Cao Tải",
+            "url": "https://vietnamgiapha.com/XemChiTietTungNguoi/1691/4/Cao+T_E1_BA_A3i.html"
+        }
+    },
+    "spouse": {
+        "description": "Sinh năm 1929 tại Huê Cầu\nGiáo viên THCS",
+        "name": "Tô Nhữ",
+        "gender": "Male",
+        "nickname": "",
+        "dob": "1929-01-01",
+        "age_at_death": "90",
+        "dod": "2017-10-16",
+        "burial_place": "Nghĩa trang Xuân Cầu"
+    },
+    "children": [
+        {
+            "number": 1,
+            "name": "Tô Thị Quý",
+            "details": "Sinh năm 1957, làm kế toán tại CT Than Vàng Danh, lấy chồng là Hoàng Văn Kháng người Yên Mỹ và định cư ở Uông Bí, có các con là Hoàng Thị Dung (1981), Hoàng Thị Dương (1982), Hoàng Minh Đức (1989)."
+        },
+        {
+            "number": 2,
+            "name": "Tô Thị Hương",
+            "details": "sinh năm 1960, giáo viên THCS, lấy chồng là Luyện Văn Sinh người Ngọc Long - Yên Mỹ, có các con là Luyện Trung Kiên (1984), Luyện Minh Trang (1989)."
+        },
+        {
+            "number": 3,
+            "name": "Tô Mười",
+            "details": "sinh năm 1963, công nhân lái xe, lấy vợ là Cao Thị Oánh sinh năm 1975 hiện ở tại Xuân Cầu, có 2 con trai là Tô Quốc Khánh (1997), Tô Cao Hoàng (2002)"
+        },
+        {
+            "number": 4,
+            "name": "Tô Tiến Bộ",
+            "details": "sinh năm 1971, làm việc và định cư ở CHLB Đức. Lấy vợ là Nguyễn Thị Dịu sinh năm 1980, có con là Tô Quản Thiện (2006)"
+        }
+    ],
+    "siblings": []
+}
