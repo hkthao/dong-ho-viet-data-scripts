@@ -23,6 +23,10 @@ def _clean_member_html(html_content: str) -> str:
                 # For now, let's just unwrap them, which keeps the text for <a> and removes <img> entirely
                 tag.unwrap() # Removes the tag but keeps its contents (text)
 
+        # Remove all attributes from the remaining tags within target_td
+        for tag in target_td.find_all(True): # Find all tags
+            tag.attrs = {} # Clear all attributes
+
         # Return the cleaned content of the target_td wrapped in a basic HTML structure
         return f"<html><body>{str(target_td)}</body></html>"
     else:
@@ -40,6 +44,11 @@ async def _crawl_and_save_html(session: aiohttp.ClientSession, url: str, output_
             response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
             
             html_content = await response.text()
+
+            # Check for specific error content before cleaning and saving
+            if "Error code:" in html_content and "Error message:" in html_content:
+                print(f"Nội dung HTML từ {url} chứa thông báo lỗi ('Error code:' và 'Error message:'). Bỏ qua việc lưu file.")
+                return False
 
             # Clean the HTML content
             print("Cleaning member HTML content...")
@@ -85,6 +94,32 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
     except Exception as e:
         print(f"Error reading {pha_he_html_path}: {e}")
         return False
+
+    if not html_content.strip() or "Error code: 2" in html_content:
+        print(f"Nội dung của {pha_he_html_path} trống hoặc chứa 'Error code: 2'. Chuyển sang thu thập dữ liệu thành viên từ ID 1-50000.")
+        async with aiohttp.ClientSession() as session:
+            all_members_crawled_successfully = True
+            member_base_url = "https://vietnamgiapha.com/XemChiTietTungNguoi/"
+            
+            if not os.path.exists(members_output_dir):
+                os.makedirs(members_output_dir)
+                print(f"Đã tạo thư mục: {members_output_dir}")
+
+            for member_id_int in range(1, 50000): # Lặp từ 1 đến 50000
+                member_id = str(member_id_int)
+                output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
+
+                if check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
+                    continue 
+
+                print(f"Đang xử lý member_id: {member_id} với family_id: {family_id}")
+                member_detail_url = f"{member_base_url}{family_id}/{member_id}/giapha.html"
+                
+                success = await _crawl_and_save_html(session, member_detail_url, output_filepath)
+                if not success:
+                    all_members_crawled_successfully = False
+                    print(f"Không thể thu thập và lưu HTML cho thành viên {member_id} từ URL: {member_detail_url}")
+        return all_members_crawled_successfully
 
     soup = BeautifulSoup(html_content, 'html.parser')
 

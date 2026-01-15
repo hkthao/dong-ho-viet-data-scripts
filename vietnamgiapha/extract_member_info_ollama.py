@@ -2,6 +2,7 @@ import json
 import sys
 import requests
 import os
+from utils import remove_html_tags # Import the utility function
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b") # Default model, can be overridden
@@ -10,49 +11,53 @@ def extract_info_with_ollama(html_content: str, family_id: str, member_id: str):
     """
     Sends HTML content to Ollama for structured data extraction according to schema-member.txt.
     """
-    prompt = f"""Bạn là một chuyên gia phân tích dữ liệu gia phả. Nhiệm vụ của bạn là trích xuất thông tin từ nội dung HTML được cung cấp về một thành viên gia đình.
-Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân thủ chính xác cấu trúc và các trường sau. Đối với trường "code", hãy định dạng nó theo mẫu "GPVN-M-{family_id}-{member_id}".
+    # Clean the HTML content by removing all tags
+    cleaned_html_content = remove_html_tags(html_content)
+
+    prompt = f"""You are a genealogy data analysis expert. Your task is to extract information about a family member from the provided HTML content.
+Extract the following information and return it as a JSON object, strictly adhering to the following structure and fields. For the "code" field, format it as "GPVN-M-{family_id}-{member_id}".
 
 {{
-  "lastName": "string", // Tên (ví dụ: Triết)
-  "firstName": "string", // Tên đệm và tên (ví dụ: Minh)
-  "code": "GPVN-M-{family_id}-{member_id}", // Mã thành viên, định dạng: GPVN-M-<family_id>-<member_id>
-  "nickname": "string", // Tên thường gọi (Lý Triết)
-  "dateOfBirth": "YYYY-MM-DDTHH:mm:ssZ", // Ngày sinh, định dạng ISO 8601. Nếu chỉ có năm, dùng YYYY-01-01T00:00:00Z.
-  "dateOfDeath": "YYYY-MM-DDTHH:mm:ssZ", // Ngày mất, định dạng ISO 8601. Nếu chỉ có năm, dùng YYYY-01-01T00:00:00Z.
-  "placeOfBirth": "string", // Nơi sinh
-  "placeOfDeath": "string", // Nơi mất
-  "phone": "string", // Điện thoại
-  "email": "string", // Email
-  "address": "string", // Địa chỉ
-  "gender": "string", // Giới tính ("Nam", "Nữ", hoặc "Không rõ")
-  "avatarUrl": "string", // URL ảnh đại diện
-  "avatarBase64": "string", // Ảnh đại diện Base64
-  "occupation": "string", // Nghề nghiệp
-  "biography": "string", // Tiểu sử (Sự nghiệp, công đức, ghi chú)
-  "isRoot": "boolean", // Có phải thủy tổ không (true/false)
-  "isDeceased": "boolean", // Đã mất (true/false)
-  "order": "integer", // Thứ tự con (ví dụ: 1)
-  "generation": "integer", // Đời thứ (ví dụ: 0, 1, 2,...)
-  "father": {{ // Thông tin cha, null nếu không có
+  "lastName": "string", // Last name (e.g., Triết)
+  "firstName": "string", // Middle and first name (e.g., Minh)
+  "code": "GPVN-M-{family_id}-{member_id}", // Member code, format: GPVN-M-<family_id>-<member_id>
+  "nickname": "string", // Nickname (e.g., Lý Triết)
+  "dateOfBirth": "YYYY-MM-DDTHH:mm:ssZ", // Date of birth, ISO 8601 format. If only the year is available, use YYYY-01-01T00:00:00Z.
+  "dateOfDeath": "YYYY-MM-DDTHH:mm:ssZ", // Date of death, ISO 8601 format. If only the year is available, use YYYY-01-01T00:00:00Z.
+  "dateOfDeathLunar": "string", // Ngày mất âm lịch (nếu có định dạng ngày/tháng hoặc có từ "Âm Lịch", "AL").
+  "placeOfBirth": "string", // Place of birth
+  "placeOfDeath": "string", // Place of death
+  "phone": "string", // Phone number
+  "email": "string", // Email address
+  "address": "string", // Address
+  "gender": "string", // Gender ("Nam", "Nữ", or "Không rõ") - use Vietnamese for consistency with source data.
+  "avatarUrl": "string", // Avatar URL
+  "avatarBase64": "string", // Avatar Base64
+  "occupation": "string", // Occupation
+  "biography": "string", // Biography (Career, merits, notes)
+  "isRoot": "boolean", // Is the progenitor (true/false)
+  "isDeceased": "boolean", // Is deceased (true/false)
+  "order": "integer", // Child order (e.g., 1)
+  "generation": "integer", // Generation number (e.g., 0, 1, 2,...)
+  "father": {{ // Father's information, null if not available
     "lastName": "string",
     "firstName": "string",
     "code": "string",
     "gender": "string"
   }},
-  "mother": {{ // Thông tin mẹ, null nếu không có
+  "mother": {{ // Mother's information, null if not available
     "lastName": "string",
     "firstName": "string",
     "code": "string",
     "gender": "string"
   }},
-  "husband": {{ // Thông tin chồng, null nếu không có
+  "husband": {{ // Husband's information, null if not available
     "lastName": "string",
     "firstName": "string",
     "code": "string",
     "gender": "string"
   }},
-  "wife": [ // Mảng các đối tượng vợ, mảng rỗng nếu không có
+  "wife": [ // Array of wife objects, empty array if not available
     {{
       "lastName": "string",
       "firstName": "string",
@@ -62,14 +67,14 @@ Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân
   ]
 }}
 
-Nếu không tìm thấy thông tin cho một trường nào đó, hãy sử dụng giá trị `null` hoặc một chuỗi/mảng rỗng phù hợp với kiểu dữ liệu của trường đó. Đối với các trường ngày tháng, nếu chỉ có năm, hãy sử dụng định dạng YYYY-01-01T00:00:00Z.
+If information for a field is not found, use `null` or an empty string/array appropriate for the field's data type. For date fields, if only the year is available, use the YYYY-01-01T00:00:00Z format. For `dateOfDeathLunar`, extract the day/month string if the death date contains "Âm Lịch", "AL", or is in "day/month" format; otherwise, use `null`.
 
-Nội dung HTML:
+HTML Content:
 ---
-{html_content}
+{cleaned_html_content}
 ---
 
-Hãy trả về CHỈ JSON hợp lệ, không có bất kỳ văn bản bổ sung nào.
+Return ONLY valid JSON, with no additional text.
 """
 
     headers = {"Content-Type": "application/json"}
@@ -109,7 +114,15 @@ Hãy trả về CHỈ JSON hợp lệ, không có bất kỳ văn bản bổ sun
         sys.exit(1)
 
 
-def extract_member_info_ollama(html_file_path: str, output_json_file_path: str, family_id: str):
+OUTPUT_BASE_DIR = "output/data/members"
+
+def extract_member_info_ollama(html_file_path: str, family_id: str):
+    member_id = os.path.basename(html_file_path).replace('.html', '')
+    
+    output_dir = os.path.join(OUTPUT_BASE_DIR, family_id)
+    os.makedirs(output_dir, exist_ok=True)
+    output_json_file_path = os.path.join(output_dir, f"{member_id}.json")
+
     if os.path.exists(output_json_file_path):
         print(f"Tệp JSON đầu ra '{output_json_file_path}' đã tồn tại. Bỏ qua trích xuất.", file=sys.stderr)
         return
@@ -119,7 +132,6 @@ def extract_member_info_ollama(html_file_path: str, output_json_file_path: str, 
         with open(html_file_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
-        member_id = os.path.basename(html_file_path).replace('.html', '')
         extracted_data = extract_info_with_ollama(html_content, family_id, member_id)
         
         with open(output_json_file_path, 'w', encoding='utf-8') as f:
@@ -134,12 +146,12 @@ def extract_member_info_ollama(html_file_path: str, output_json_file_path: str, 
         sys.exit(1)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print("Cách dùng: python extract_member_info_ollama.py <input_html_file_path> <output_json_file_path> <family_id>")
+    if len(sys.argv) < 3: # Reduced from 4 to 3 arguments
+        print("Cách dùng: python extract_member_info_ollama.py <input_html_file_path> <family_id>")
         sys.exit(1)
     
     input_html_file = sys.argv[1]
-    output_json_file = sys.argv[2]
-    family_id_arg = sys.argv[3]
+    # output_json_file is now constructed inside the function
+    family_id_arg = sys.argv[2] # family_id is now the second argument
 
-    extract_member_info_ollama(input_html_file, output_json_file, family_id_arg)
+    extract_member_info_ollama(input_html_file, family_id_arg)

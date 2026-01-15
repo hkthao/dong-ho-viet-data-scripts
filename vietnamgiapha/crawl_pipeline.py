@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 
@@ -48,4 +49,4 @@ if __name__ == "__main__":
         sys.exit(1)
     
     target_family_id = sys.argv[1]
-    crawl_pipeline(target_family_id)
+    asyncio.run(crawl_pipeline(target_family_id))

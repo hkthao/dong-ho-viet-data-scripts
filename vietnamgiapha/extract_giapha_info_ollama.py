@@ -2,6 +2,7 @@ import json
 import sys
 import requests
 import os
+from utils import remove_html_tag_attributes # Import the utility function
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 
@@ -9,6 +10,9 @@ def extract_info_with_ollama(html_content: str, model_name: str):
     """
     Sends HTML content to Ollama for structured data extraction according to schema-family.txt.
     """
+    # Clean the HTML content by removing all tag attributes
+    cleaned_html_content = remove_html_tag_attributes(html_content)
+
     prompt = f"""Bạn là một chuyên gia phân tích dữ liệu gia phả. Nhiệm vụ của bạn là trích xuất thông tin từ nội dung HTML được cung cấp về thông tin chung của gia phả.
 Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân thủ chính xác cấu trúc và các trường sau:
 
@@ -36,7 +40,7 @@ Nếu không tìm thấy thông tin cho một trường nào đó, hãy sử d�
 
 Nội dung HTML:
 ---
-{html_content}
+{cleaned_html_content}
 ---
 
 Hãy trả về CHỈ JSON hợp lệ, không có bất kỳ văn bản bổ sung nào.

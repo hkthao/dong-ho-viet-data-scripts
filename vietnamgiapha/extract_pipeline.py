@@ -5,10 +5,10 @@ import asyncio
 from utils import run_command, check_file_exists, check_directory_not_empty
 
 # Define the paths for scripts
-EXTRACT_GIAPHA_INFO_SCRIPT = "extract_giapha_info_ollama.py"
-EXTRACT_MEMBER_INFO_SCRIPT = "extract_member_info_ollama.py"
+EXTRACT_GIAPHA_INFO_SCRIPT = "vietnamgiapha/extract_giapha_info_ollama.py"
+EXTRACT_MEMBER_INFO_SCRIPT = "vietnamgiapha/extract_member_info_ollama.py"
 
-async def extract_pipeline(family_id: str):
+async def extract_pipeline(family_id: str, limit: int = None):
     print(f"Starting extraction pipeline for Family ID: {family_id}")
 
     # --- Define common paths ---
@@ -31,7 +31,7 @@ async def extract_pipeline(family_id: str):
 
     if not check_file_exists(giapha_info_json_path, "Main Giapha Info JSON"):
         # The extract_giapha_info.py script now expects the path to giapha.html
-        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_html_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b"), pha_ky_gia_su_html_path, thuy_to_html_path, toc_uoc_html_path],
+        if not await run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_html_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b"), pha_ky_gia_su_html_path, thuy_to_html_path, toc_uoc_html_path],
                            f"Extracting main family info for {family_id}"):
             return False
     
@@ -40,28 +40,53 @@ async def extract_pipeline(family_id: str):
     if not member_html_files:
         print(f"No member HTML files found in {members_raw_html_dir}. Skipping member info extraction.")
     else:
-        all_members_extracted = True
+        # Apply limit if provided
+        if limit is not None:
+            member_html_files = member_html_files[:limit]
+            print(f"Limiting member extraction to {limit} files.")
+
+        tasks = []
         for member_html_filename in member_html_files:
             member_id = member_html_filename.replace('.html', '')
             member_html_path = os.path.join(members_raw_html_dir, member_html_filename)
             member_json_path = os.path.join(members_data_dir, f"{member_id}.json")
 
             if not check_file_exists(member_json_path, f"Member {member_id} Info JSON"):
-                if not run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, member_json_path, family_id],
-                                   f"Extracting info for member {member_id}"):
-                    all_members_extracted = False
-                    break
-
-        if not all_members_extracted:
-            return False
+                task = run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, member_json_path, family_id],
+                                   f"Extracting info for member {member_id}")
+                tasks.append(task)
+        
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(f"Error processing member {member_html_files[i].replace('.html', '')}: {result}", file=sys.stderr)
+                    return False # Return False if any task raised an exception
+                elif not result:
+                    print(f"Extraction failed for member {member_html_files[i].replace('.html', '')}", file=sys.stderr)
+                    return False # Return False if any task explicitly returned False
+        else:
+            print("All member JSON files already exist or no members to process.")
 
     print(f"\nExtraction pipeline completed successfully for Family ID: {family_id}")
     return True
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python extract_pipeline.py <family_id>")
+        print("Usage: python extract_pipeline.py <family_id> [limit]")
         sys.exit(1)
     
     target_family_id = sys.argv[1]
-    asyncio.run(extract_pipeline(target_family_id))
+    extraction_limit = None
+    if len(sys.argv) > 2:
+        try:
+            extraction_limit = int(sys.argv[2])
+            if extraction_limit < 1:
+                print("Error: limit must be a positive integer.")
+                sys.exit(1)
+        except ValueError:
+            print("Error: limit must be an integer.")
+            print("Usage: python extract_pipeline.py <family_id> [limit]")
+            sys.exit(1)
+
+    asyncio.run(extract_pipeline(target_family_id, extraction_limit))
