@@ -105,11 +105,20 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 os.makedirs(members_output_dir)
                 print(f"Đã tạo thư mục: {members_output_dir}")
 
+            consecutive_member_failures = 0
+            MEMBER_FAILURE_THRESHOLD = 100
+
             for member_id_int in range(1, 50000): # Lặp từ 1 đến 50000
+                if consecutive_member_failures >= MEMBER_FAILURE_THRESHOLD:
+                    print(f"Đã đạt {MEMBER_FAILURE_THRESHOLD} lần thất bại liên tiếp khi thu thập thành viên. Bỏ qua các thành viên còn lại cho family ID này.")
+                    all_members_crawled_successfully = False
+                    break
+
                 member_id = str(member_id_int)
                 output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
 
                 if check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
+                    consecutive_member_failures = 0 # Reset on existing file (implies previous success)
                     continue 
 
                 print(f"Đang xử lý member_id: {member_id} với family_id: {family_id}")
@@ -117,8 +126,11 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 
                 success = await _crawl_and_save_html(session, member_detail_url, output_filepath)
                 if not success:
-                    all_members_crawled_successfully = False
-                    print(f"Không thể thu thập và lưu HTML cho thành viên {member_id} từ URL: {member_detail_url}")
+                    consecutive_member_failures += 1
+                    all_members_crawled_successfully = False 
+                    print(f"Không thể thu thập và lưu HTML cho thành viên {member_id} từ URL: {member_detail_url}. Số lần thất bại liên tiếp: {consecutive_member_failures}")
+                else:
+                    consecutive_member_failures = 0
         return all_members_crawled_successfully
 
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -136,7 +148,15 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
 
     async with aiohttp.ClientSession() as session: # Use an aiohttp ClientSession for persistent connection
         all_members_crawled_successfully = True
+        consecutive_member_failures = 0
+        MEMBER_FAILURE_THRESHOLD = 100
+        
         for link in links:
+            if consecutive_member_failures >= MEMBER_FAILURE_THRESHOLD:
+                print(f"Đã đạt {MEMBER_FAILURE_THRESHOLD} lần thất bại liên tiếp khi thu thập thành viên. Bỏ qua các thành viên còn lại cho family ID này.")
+                all_members_crawled_successfully = False
+                break
+
             href = link.get('href')
             print(f"Checking href: {href}")
             match = re.search(r'o\((\d+),(\d+)\)', href)
@@ -148,7 +168,8 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 # Construct the output file path for this member
                 output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
                 
-                if check_file_exists(output_filepath, f"Member {member_id} HTML"):
+                if check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
+                    consecutive_member_failures = 0 # Reset on existing file (implies previous success)
                     continue # Skip if file already exists
                 
                 print(f"Processing member_id: {member_id} from family_id: {extracted_family_id}")
@@ -157,8 +178,11 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 
                 success = await _crawl_and_save_html(session, member_detail_url, output_filepath)
                 if not success:
+                    consecutive_member_failures += 1
                     all_members_crawled_successfully = False
-                    print(f"Failed to crawl and save HTML for member {member_id} from URL: {member_detail_url}")
+                    print(f"Không thể thu thập và lưu HTML cho thành viên {member_id} từ URL: {member_detail_url}. Số lần thất bại liên tiếp: {consecutive_member_failures}")
+                else:
+                    consecutive_member_failures = 0
     return all_members_crawled_successfully
 
 if __name__ == "__main__":
