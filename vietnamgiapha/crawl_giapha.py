@@ -2,11 +2,37 @@ import requests
 from requests import Session
 import os
 import sys
+from bs4 import BeautifulSoup
 
 # This script uses the 'requests' library for crawling static HTML pages.
 # 'requests' is generally more lightweight and efficient for static content
 # compared to Playwright, which is better suited for dynamic, JavaScript-rendered pages.
 # For dynamic page crawling, refer to crawl_member_details.py.
+
+def _clean_giapha_html(html_content: str) -> str:
+    """
+    Cleans the giapha.html content by extracting only the content of the first <tr>
+    within the first <table> found inside a specific <td> tag.
+    """
+    soup = BeautifulSoup(html_content, 'lxml') # Use 'lxml' parser for better performance
+
+    target_td = soup.find('td', valign='top', background="https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg", height="100%")
+
+    if target_td:
+        first_table = target_td.find('table')
+        if first_table:
+            first_tr = first_table.find('tr')
+            if first_tr:
+                # Return the content of the first <tr> within a simple HTML structure
+                return f"<html><body><table>{str(first_tr)}</table></body></html>"
+            else:
+                print("Warning: First <tr> not found within the first <table> in target <td>.")
+        else:
+            print("Warning: First <table> not found within target <td>.")
+    else:
+        print("Warning: Specific <td> tag not found.")
+    
+    return html_content # Return original content if specific elements are not found
 
 def _crawl_and_save_html_with_requests(session: requests.Session, url: str, output_filepath: str):
     """
@@ -20,6 +46,15 @@ def _crawl_and_save_html_with_requests(session: requests.Session, url: str, outp
         # Explicitly set encoding to utf-8, as declared in the HTML meta tag
         response.encoding = 'utf-8'
 
+        html_content_to_save = response.text
+        # Clean the HTML content if it's giapha.html
+        if os.path.basename(output_filepath) == "giapha.html":
+            print("Cleaning giapha.html content...")
+            html_content_to_save = _clean_giapha_html(response.text)
+            if not html_content_to_save: # If cleaning failed, use original content or handle as error
+                print("HTML cleaning returned empty content, using original content.")
+                html_content_to_save = response.text # Fallback to original content
+
         # Ensure the directory exists before writing the file
         output_dir = os.path.dirname(output_filepath)
         if not os.path.exists(output_dir):
@@ -27,7 +62,7 @@ def _crawl_and_save_html_with_requests(session: requests.Session, url: str, outp
             print(f"Created directory: {output_dir}")
 
         with open(output_filepath, 'w', encoding='utf-8') as f:
-            f.write(response.text)
+            f.write(html_content_to_save)
         print(f"Successfully saved HTML to: {output_filepath}")
         return True
     except requests.exceptions.RequestException as e:

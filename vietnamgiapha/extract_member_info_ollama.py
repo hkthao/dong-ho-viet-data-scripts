@@ -35,7 +35,7 @@ Các trường cần trích xuất:
     *   `gender`: Giới tính ("Nam", "Nữ", hoặc "Không rõ").
     *   `dob`: Ngày sinh (định dạng YYYY-MM-DD nếu có ngày tháng đầy đủ, hoặc YYYY-01-01 nếu chỉ có năm).
     *   `dod`: Ngày mất (định dạng YYYY-MM-DD nếu có ngày tháng đầy đủ, hoặc YYYY-01-01 nếu chỉ có năm).
-    *   `description`: Ghi chú về vợ/chồng.
+    *   `description`: Sự nghiệp, công đức, ghi chú.
 
 Nếu không tìm thấy thông tin, hãy sử dụng giá trị `null` hoặc một chuỗi rỗng phù hợp.
 

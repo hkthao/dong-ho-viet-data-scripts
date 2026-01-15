@@ -7,6 +7,30 @@ import re
 import asyncio
 from playwright.async_api import async_playwright
 
+def _clean_member_html(html_content: str) -> str:
+    """
+    Cleans the member detail HTML content by extracting only the content of a specific <td> tag
+    and removing specified tags (p, span, font, img, a) within it.
+    """
+    soup = BeautifulSoup(html_content, 'lxml') # Use 'lxml' parser for better performance
+
+    target_td = soup.find('td', colspan="2", valign='top', background="https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg", height="100%")
+
+    if target_td:
+        # Remove unwanted tags, keeping their text content where applicable
+        for tag_name in ['p', 'span', 'font', 'img', 'a']:
+            for tag in target_td.find_all(tag_name):
+                # If it's an image or link, replace with a placeholder or remove entirely
+                # For now, let's just unwrap them, which keeps the text for <a> and removes <img> entirely
+                tag.unwrap() # Removes the tag but keeps its contents (text)
+
+        # Return the cleaned content of the target_td wrapped in a basic HTML structure
+        return f"<html><body>{str(target_td)}</body></html>"
+    else:
+        print("Warning: Specific <td> tag not found in member detail page. Returning original content.")
+    
+    return html_content # Return original content if specific elements are not found
+
 async def _crawl_and_save_html(url: str, output_filepath: str):
     """
     Helper function to crawl a URL using Playwright and save its HTML content to a specified file.
@@ -25,6 +49,13 @@ async def _crawl_and_save_html(url: str, output_filepath: str):
             html_content = await page.content()
             await browser.close()
 
+        # Clean the HTML content
+        print("Cleaning member HTML content...")
+        html_content_to_save = _clean_member_html(html_content)
+        if not html_content_to_save: # Fallback if cleaning returns empty
+            print("HTML cleaning returned empty content, using original content.")
+            html_content_to_save = html_content 
+
         # Ensure the directory exists before writing the file
         output_dir = os.path.dirname(output_filepath)
         if not os.path.exists(output_dir):
@@ -32,7 +63,7 @@ async def _crawl_and_save_html(url: str, output_filepath: str):
             print(f"Created directory: {output_dir}")
 
         with open(output_filepath, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+            f.write(html_content_to_save)
         print(f"Successfully saved HTML to: {output_filepath}")
         return True
     except Exception as e:

@@ -274,6 +274,7 @@ def main():
                 print(f"Cảnh báo: Không tìm thấy 'main_person' trong tệp {member_file}. Bỏ qua.", file=sys.stderr)
                 continue
 
+            # --- Process main_person ---
             member_name_raw = main_person.get("name")
             if member_name_raw is None or member_name_raw == "":
                 member_name = "Unknown Member"
@@ -293,7 +294,7 @@ def main():
                   child_order is not None and str(child_order).strip().isdigit() and int(str(child_order).strip()) == 1):
                 is_root = True
 
-            print(f"DEBUG: Xử lý thành viên: '{member_name}' -> Họ: '{last_name}', Tên: '{first_name}', isRoot: {is_root}", file=sys.stderr)
+            print(f"DEBUG: Xử lý thành viên: '{member_name}' (ID gốc: {original_file_id}) -> Họ: '{last_name}', Tên: '{first_name}', isRoot: {is_root}", file=sys.stderr)
 
             member_payload = {
                 "lastName": last_name,
@@ -313,21 +314,66 @@ def main():
             # Remove None and empty string values from payload
             member_payload = {k: v for k, v in member_payload.items() if v is not None and v != ""}
             
-            # Check if member already exists
+            # Check if main_person already exists
             member_code_to_check = f"VNGP-{identifier_for_codes}-{original_file_id}"
             existing_member = get_member_by_family_id_and_code(family_id_for_payload, member_code_to_check)
 
             if existing_member:
                 print(f"Thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}, Code: {member_code_to_check}) đã tồn tại với ID: {existing_member['id']}. Bỏ qua tạo mới.")
                 member_id_map[original_file_id] = existing_member["id"]
-                continue
-            
-            created_member_guid = create_member(member_payload)
-            if created_member_guid:
-                print(f"Đã tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}) với ID: {created_member_guid}")
-                member_id_map[original_file_id] = created_member_guid
             else:
-                print(f"Không thể tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}). Bỏ qua.")
+                created_member_guid = create_member(member_payload)
+                if created_member_guid:
+                    print(f"Đã tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}) với ID: {created_member_guid}")
+                    member_id_map[original_file_id] = created_member_guid
+                else:
+                    print(f"Không thể tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}). Bỏ qua.")
+
+            # --- Process spouses ---
+            spouses = member_data_raw.get("spouses", [])
+            for idx, spouse_data in enumerate(spouses):
+                spouse_name_raw = spouse_data.get("name")
+                if spouse_name_raw is None or spouse_name_raw == "":
+                    spouse_name = "Unknown Spouse"
+                else:
+                    spouse_name = str(spouse_name_raw)
+                spouse_last_name, spouse_first_name = parse_name(spouse_name)
+
+                # Generate a unique code for the spouse
+                spouse_original_id = f"{original_file_id}-spouse-{idx+1}"
+                spouse_code = f"VNGP-{identifier_for_codes}-{spouse_original_id}"
+
+                print(f"DEBUG: Xử lý vợ/chồng: '{spouse_name}' (ID gốc: {spouse_original_id}) -> Họ: '{spouse_last_name}', Tên: '{spouse_first_name}', isRoot: False", file=sys.stderr)
+
+                spouse_payload = {
+                    "lastName": spouse_last_name,
+                    "firstName": spouse_first_name,
+                    "code": spouse_code,
+                    "familyId": family_id_for_payload,
+                    "nickname": spouse_data.get("nickname"),
+                    "dateOfBirth": format_date_for_api(spouse_data.get("dob")),
+                    "dateOfDeath": format_date_for_api(spouse_data.get("dod")),
+                    "gender": "Male" if spouse_data.get("gender") == "Nam" else ("Female" if spouse_data.get("gender") == "Nữ" else "Other"),
+                    "biography": spouse_data.get("description"),
+                    "isDeceased": spouse_data.get("dod") is not None and spouse_data.get("dod") != "null" and spouse_data.get("dod") != "",
+                    "isRoot": False # Spouses are generally not roots themselves
+                }
+                # Remove None and empty string values from payload
+                spouse_payload = {k: v for k, v in spouse_payload.items() if v is not None and v != ""}
+
+                # Check if spouse already exists
+                existing_spouse = get_member_by_family_id_and_code(family_id_for_payload, spouse_code)
+
+                if existing_spouse:
+                    print(f"Thành viên '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}, Code: {spouse_code}) đã tồn tại với ID: {existing_spouse['id']}. Bỏ qua tạo mới.")
+                    member_id_map[spouse_original_id] = existing_spouse["id"]
+                else:
+                    created_spouse_guid = create_member(spouse_payload)
+                    if created_spouse_guid:
+                        print(f"Đã tạo vợ/chồng '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}) với ID: {created_spouse_guid}")
+                        member_id_map[spouse_original_id] = created_spouse_guid
+                    else:
+                        print(f"Không thể tạo vợ/chồng '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}). Bỏ qua.")
             
         except Exception as e:
             print(f"Lỗi khi xử lý tệp {member_file}: {e}", file=sys.stderr)
