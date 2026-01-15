@@ -7,7 +7,7 @@ from crawl_member_details import crawl_member_details
 # Define the paths for scripts
 CRAWL_GIAPHA_SCRIPT = "vietnamgiapha/crawl_giapha.py"
 
-def crawl_pipeline(family_id: str):
+async def crawl_pipeline(family_id: str):
     print(f"Starting crawling pipeline for Family ID: {family_id}")
 
     # --- Define common paths ---
@@ -29,14 +29,14 @@ def crawl_pipeline(family_id: str):
 
     if not check_file_exists(giapha_html_path, "Main Giapha HTML"):
         # CRAWL_GIAPHA_SCRIPT now expects the full path for giapha.html and the base dir for other files
-        if not run_command(["python3", CRAWL_GIAPHA_SCRIPT, family_id, giapha_html_path, raw_html_dir], 
+        if not await run_command(["python3", CRAWL_GIAPHA_SCRIPT, family_id, giapha_html_path, raw_html_dir], 
                            f"Crawling main family pages for {family_id}"):
             return False
     
     # --- Step 1.2: Crawl individual member details HTML pages ---
     # The crawl_member_details.py script now handles individual file existence checks
     # and directly awaits its execution to avoid subprocess issues.
-    if not crawl_member_details(family_id, members_raw_html_dir, pha_he_html_path):
+    if not await crawl_member_details(family_id, members_raw_html_dir, pha_he_html_path):
         return False
 
     print(f"\nCrawling pipeline completed successfully for Family ID: {family_id}")

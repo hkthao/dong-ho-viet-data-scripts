@@ -1,5 +1,5 @@
-import requests
-from requests import Session
+import aiohttp
+import asyncio
 import os
 import sys
 from bs4 import BeautifulSoup
@@ -30,48 +30,45 @@ def _clean_member_html(html_content: str) -> str:
     
     return html_content # Return original content if specific elements are not found
 
-def _crawl_and_save_html(session: requests.Session, url: str, output_filepath: str):
+async def _crawl_and_save_html(session: aiohttp.ClientSession, url: str, output_filepath: str):
     """
-    Helper function to crawl a URL using requests.Session and save its HTML content to a specified file.
+    Helper function to crawl a URL asynchronously using aiohttp.ClientSession and save its HTML content to a specified file.
     """
     try:
-        print(f"Crawling URL: {url} using requests")
-        response = session.get(url, timeout=30) # 30 seconds timeout
-        response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
-        
-        # Explicitly set encoding to utf-8, as declared in the HTML meta tag
-        response.encoding = 'utf-8'
-        
-        html_content = response.text
+        print(f"Crawling URL: {url} using aiohttp")
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response: # 30 seconds timeout
+            response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+            
+            html_content = await response.text()
 
-        # Clean the HTML content
-        print("Cleaning member HTML content...")
-        html_content_to_save = _clean_member_html(html_content)
-        if not html_content_to_save: # Fallback if cleaning returns empty
-            print("HTML cleaning returned empty content, using original content.")
-            html_content_to_save = html_content 
+            # Clean the HTML content
+            print("Cleaning member HTML content...")
+            html_content_to_save = _clean_member_html(html_content)
+            if not html_content_to_save: # Fallback if cleaning returns empty
+                print("HTML cleaning returned empty content, using original content.")
+                html_content_to_save = html_content 
 
-        # Ensure the directory exists before writing the file
-        output_dir = os.path.dirname(output_filepath)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            print(f"Created directory: {output_dir}")
+            # Ensure the directory exists before writing the file
+            output_dir = os.path.dirname(output_filepath)
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+                print(f"Created directory: {output_dir}")
 
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            f.write(html_content_to_save)
-        print(f"Successfully saved HTML to: {output_filepath}")
-        return True
-    except requests.exceptions.RequestException as e:
-        print(f"Error crawling {url} with requests: {e}")
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                f.write(html_content_to_save)
+            print(f"Successfully saved HTML to: {output_filepath}")
+            return True
+    except aiohttp.ClientError as e:
+        print(f"Error crawling URL {url} with aiohttp: {e}")
         return False
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An unexpected error occurred while crawling URL {url}: {e}")
         return False
 
 
-def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
+async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
     """
-    Reads pha_he.html, extracts member detail URLs, crawls them, and saves to members_output_dir.
+    Reads pha_he.html, extracts member detail URLs, crawls them asynchronously, and saves to members_output_dir.
 
     Args:
         family_id (str): The ID of the family.
@@ -102,7 +99,8 @@ def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_pa
     links = soup.find_all('a', href=re.compile(r'javascript:o\(\d+,\d+\)'))
     print(f"Found {len(links)} member links in {pha_he_html_path}.")
 
-    with Session() as session: # Use a session for persistent connection
+    async with aiohttp.ClientSession() as session: # Use an aiohttp ClientSession for persistent connection
+        all_members_crawled_successfully = True
         for link in links:
             href = link.get('href')
             print(f"Checking href: {href}")
@@ -122,8 +120,11 @@ def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_pa
                 # Construct the full member detail URL
                 member_detail_url = f"{member_base_url}{extracted_family_id}/{member_id}/giapha.html"
                 
-                _crawl_and_save_html(session, member_detail_url, output_filepath)
-    return True
+                success = await _crawl_and_save_html(session, member_detail_url, output_filepath)
+                if not success:
+                    all_members_crawled_successfully = False
+                    print(f"Failed to crawl and save HTML for member {member_id} from URL: {member_detail_url}")
+    return all_members_crawled_successfully
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
@@ -134,4 +135,4 @@ if __name__ == "__main__":
     members_output_directory = sys.argv[2]
     pha_he_html_file = sys.argv[3]
     
-    crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file)
+    asyncio.run(crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file))
