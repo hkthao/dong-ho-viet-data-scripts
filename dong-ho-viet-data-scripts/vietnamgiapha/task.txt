@@ -1,0 +1,6 @@
+Kế hoạch của tôi là:
+   1. Đọc nội dung HTML: Đọc nội dung từng file HTML.
+   2. Phân tích HTML: Trích xuất các điểm dữ liệu liên quan từ HTML bằng phương pháp phân tích mạnh mẽ.
+   3. Ánh xạ với Schema: Chuyển đổi dữ liệu đã trích xuất sang định dạng schema-member.txt. Việc này bao gồm xử lý các quy ước
+      đặt tên tiếng Việt, định dạng ngày tháng và điền các giá trị mặc định cho các trường còn thiếu.
+   4. Ghi file JSON: Lưu dữ liệu JSON đã định dạng vào thư mục data/members tương ứng.

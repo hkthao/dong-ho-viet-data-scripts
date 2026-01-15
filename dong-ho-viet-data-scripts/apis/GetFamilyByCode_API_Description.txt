@@ -1,0 +1,56 @@
+# API Name: Get Family By Code
+
+## Endpoint
+`GET {{baseUrl}}/api/family/by-code/{code}`
+
+## Headers
+*   `Authorization`: `Bearer {{token}}` (assuming you have a token variable)
+
+## Path Parameters
+*   `code` (string): The unique code of the family to retrieve.
+
+## Request Body (JSON)
+(No request body required for GET request)
+
+## Successful Response (Status: 200 OK)
+Returns a `FamilyDto` object containing the family's details.
+
+```json
+{
+  "id": "guid-of-family",
+  "name": "Tên Gia Đình",
+  "code": "Mã Gia Đình",
+  "description": "Mô tả về gia đình",
+  "address": "Địa chỉ của gia đình",
+  "genealogyRecord": "Bản ghi phả hệ",
+  "progenitorName": "Tên Thủy tổ",
+  "familyCovenant": "Tộc Ước",
+  "contactInfo": "Thông tin liên hệ",
+  "avatarUrl": "URL ảnh đại diện",
+  "visibility": "Private/Public",
+  "totalMembers": 0,
+  "totalGenerations": 0,
+  "source": "System",
+  "isVerified": false,
+  "created": "YYYY-MM-DDTHH:MM:SS.sssZ",
+  "createdBy": "User ID",
+  "lastModified": "YYYY-MM-DDTHH:MM:SS.sssZ",
+  "lastModifiedBy": "User ID"
+}
+```
+
+## Error Response (Status: 404 Not Found)
+If the family with the specified code is not found, it returns a 404 Not Found status with an error message.
+
+```json
+{
+  "succeeded": false,
+  "errors": [
+    "Family with code 'XYZ' not found."
+  ],
+  "message": null
+}
+```
+
+## Description
+This API allows retrieving the detailed information of a family using its unique code.

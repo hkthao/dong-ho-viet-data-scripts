@@ -1,0 +1,48 @@
+# API Name: Update Member
+
+## Endpoint
+`PUT {{baseUrl}}/api/member/{id}`
+
+## Headers
+*   `Authorization`: `Bearer {{token}}` (assuming you have a token variable)
+*   `Content-Type`: `application/json`
+
+## Path Parameters
+*   `id` (Guid): The ID of the member to update. This `id` must also match the `Id` in the request body.
+
+## Request Body (JSON)
+```json
+{
+  "LastName": "Nguyen",
+  "FirstName": "Van A",
+  "Id": "a1b2c3d4-e5f6-7890-1234-567890abcdef", // Must match the ID in the URL
+  "Code": "M001",
+  "Nickname": "Teo",
+  "DateOfBirth": "1990-01-15T00:00:00Z",
+  "DateOfDeath": null,
+  "PlaceOfBirth": "Ha Noi",
+  "PlaceOfDeath": null,
+  "Phone": "0901234567",
+  "Email": "vana@example.com",
+  "Address": "123 Cau Giay, Ha Noi",
+  "Gender": "Male",
+  "AvatarUrl": "http://example.com/avatar.jpg",
+  "AvatarBase64": null,
+  "Occupation": "Engineer",
+  "Biography": "A brief biography of Van A.",
+  "FamilyId": "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+  "IsRoot": false,
+  "IsDeceased": false,
+  "Order": 1,
+  "BirthLocationId": null,
+  "DeathLocationId": null,
+  "ResidenceLocationId": null,
+  "FatherId": null,
+  "MotherId": null,
+  "HusbandId": null,
+  "WifeId": null
+}
+```
+
+## Description
+This API allows updating an existing member's information. The `id` in the URL path must match the `Id` property in the request body.
