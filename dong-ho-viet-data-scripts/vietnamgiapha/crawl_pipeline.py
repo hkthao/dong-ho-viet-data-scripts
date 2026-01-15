@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 
-from utils import run_command, check_file_exists, check_directory_not_empty
+from utils import run_command, check_file_exists
 from crawl_member_details import crawl_member_details as async_crawl_member_details
 
 # Define the paths for scripts
