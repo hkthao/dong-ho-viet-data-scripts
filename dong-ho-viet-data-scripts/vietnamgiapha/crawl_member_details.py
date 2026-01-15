@@ -1,11 +1,9 @@
-# Run 'playwright install' in your terminal to install necessary browser binaries.
 import requests
+from requests import Session
 import os
 import sys
 from bs4 import BeautifulSoup
 import re
-import asyncio
-from playwright.async_api import async_playwright
 from utils import check_file_exists
 
 def _clean_member_html(html_content: str) -> str:
@@ -32,23 +30,19 @@ def _clean_member_html(html_content: str) -> str:
     
     return html_content # Return original content if specific elements are not found
 
-async def _crawl_and_save_html(url: str, output_filepath: str):
+def _crawl_and_save_html(session: requests.Session, url: str, output_filepath: str):
     """
-    Helper function to crawl a URL using Playwright and save its HTML content to a specified file.
+    Helper function to crawl a URL using requests.Session and save its HTML content to a specified file.
     """
     try:
-        print(f"Crawling URL: {url} using Playwright")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
-            await page.goto(url, timeout=30000) # 30 seconds timeout
-            
-            # Wait for the network to be idle or for a specific selector if content is dynamic
-            # For now, let's wait for network idle as a general approach
-            await page.wait_for_load_state("networkidle", timeout=30000) # 30 seconds timeout
-            
-            html_content = await page.content()
-            await browser.close()
+        print(f"Crawling URL: {url} using requests")
+        response = session.get(url, timeout=30) # 30 seconds timeout
+        response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+        
+        # Explicitly set encoding to utf-8, as declared in the HTML meta tag
+        response.encoding = 'utf-8'
+        
+        html_content = response.text
 
         # Clean the HTML content
         print("Cleaning member HTML content...")
@@ -67,12 +61,15 @@ async def _crawl_and_save_html(url: str, output_filepath: str):
             f.write(html_content_to_save)
         print(f"Successfully saved HTML to: {output_filepath}")
         return True
+    except requests.exceptions.RequestException as e:
+        print(f"Error crawling {url} with requests: {e}")
+        return False
     except Exception as e:
-        print(f"Error crawling {url} with Playwright: {e}")
+        print(f"An unexpected error occurred: {e}")
         return False
 
 
-async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
+def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
     """
     Reads pha_he.html, extracts member detail URLs, crawls them, and saves to members_output_dir.
 
@@ -87,10 +84,10 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
         print(f"Successfully read content from: {pha_he_html_path}")
     except FileNotFoundError:
         print(f"Error: {pha_he_html_path} not found.")
-        return
+        return False
     except Exception as e:
         print(f"Error reading {pha_he_html_path}: {e}")
-        return
+        return False
 
     soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -105,26 +102,28 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
     links = soup.find_all('a', href=re.compile(r'javascript:o\(\d+,\d+\)'))
     print(f"Found {len(links)} member links in {pha_he_html_path}.")
 
-    for link in links:
-        href = link.get('href')
-        print(f"Checking href: {href}")
-        match = re.search(r'o\((\d+),(\d+)\)', href)
-        if match:
-            print(f"Match found for href: {href}")
-            extracted_family_id = match.group(1)
-            member_id = match.group(2)
-            
-            # Construct the output file path for this member
-            output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
-            
-            if check_file_exists(output_filepath, f"Member {member_id} HTML"):
-                continue # Skip if file already exists
-            
-            print(f"Processing member_id: {member_id} from family_id: {extracted_family_id}")
-            # Construct the full member detail URL
-            member_detail_url = f"{member_base_url}{extracted_family_id}/{member_id}/giapha.html"
-            
-            await _crawl_and_save_html(member_detail_url, output_filepath)
+    with Session() as session: # Use a session for persistent connection
+        for link in links:
+            href = link.get('href')
+            print(f"Checking href: {href}")
+            match = re.search(r'o\((\d+),(\d+)\)', href)
+            if match:
+                print(f"Match found for href: {href}")
+                extracted_family_id = match.group(1)
+                member_id = match.group(2)
+                
+                # Construct the output file path for this member
+                output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
+                
+                if check_file_exists(output_filepath, f"Member {member_id} HTML"):
+                    continue # Skip if file already exists
+                
+                print(f"Processing member_id: {member_id} from family_id: {extracted_family_id}")
+                # Construct the full member detail URL
+                member_detail_url = f"{member_base_url}{extracted_family_id}/{member_id}/giapha.html"
+                
+                _crawl_and_save_html(session, member_detail_url, output_filepath)
+    return True
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
@@ -135,4 +134,4 @@ if __name__ == "__main__":
     members_output_directory = sys.argv[2]
     pha_he_html_file = sys.argv[3]
     
-    asyncio.run(crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file))
+    crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file)
