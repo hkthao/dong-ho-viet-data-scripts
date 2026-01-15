@@ -169,7 +169,7 @@ def pipeline(family_id: str):
     giapha_info_json_path = os.path.join(data_dir, f"giapha_info_{family_id}.json")
     if not check_file_exists(giapha_info_json_path, "Main Giapha Info JSON"):
         # The extract_giapha_info.py script now expects the path to giapha.md
-        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_md_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b")],
+        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_md_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b"), pha_ky_gia_su_html_path, thuy_to_html_path, toc_uoc_html_path],
                            f"Extracting main family info for {family_id}"):
             return False
     
