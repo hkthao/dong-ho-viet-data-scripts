@@ -132,38 +132,38 @@ def pipeline(family_id: str):
 
 
 
-    # --- Step 2.1: Extract main family information from Markdown ---
-    # giapha_info_json_path = os.path.join(data_dir, f"giapha_info_{family_id}.json")
-    # if not check_file_exists(giapha_info_json_path, "Main Giapha Info JSON"):
-    #     # The extract_giapha_info.py script now expects the path to giapha.md
-    #     if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_md_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b"), pha_ky_gia_su_html_path, thuy_to_html_path, toc_uoc_html_path],
-    #                        f"Extracting main family info for {family_id}"):
-    #         return False
+    # --- Step 2.1: Extract main family information from HTML ---
+    giapha_info_json_path = os.path.join(data_dir, f"giapha_info_{family_id}.json")
+    if not check_file_exists(giapha_info_json_path, "Main Giapha Info JSON"):
+        # The extract_giapha_info.py script now expects the path to giapha.html
+        if not run_command(["python3", EXTRACT_GIAPHA_INFO_SCRIPT, giapha_html_path, giapha_info_json_path, os.getenv("OLLAMA_MODEL", "llama3:8b"), pha_ky_gia_su_html_path, thuy_to_html_path, toc_uoc_html_path],
+                           f"Extracting main family info for {family_id}"):
+            return False
     
-    # --- Step 2.2: Extract individual member information from Markdown ---
-    # member_md_files = [f for f in os.listdir(members_markdown_dir) if f.endswith('.md')]
-    # if not member_md_files:
-    #     print(f"No member Markdown files found in {members_markdown_dir}. Skipping member info extraction.")
-    # else:
-    #     all_members_extracted = True
-    #     for member_md_filename in member_md_files:
-    #         member_id = member_md_filename.replace('.md', '')
-    #         member_md_path = os.path.join(members_markdown_dir, member_md_filename)
-    #         member_json_path = os.path.join(members_data_dir, f"{member_id}.json")
+    # --- Step 2.2: Extract individual member information from HTML ---
+    member_html_files = [f for f in os.listdir(members_raw_html_dir) if f.endswith('.html')]
+    if not member_html_files:
+        print(f"No member HTML files found in {members_raw_html_dir}. Skipping member info extraction.")
+    else:
+        all_members_extracted = True
+        for member_html_filename in member_html_files:
+            member_id = member_html_filename.replace('.html', '')
+            member_html_path = os.path.join(members_raw_html_dir, member_html_filename)
+            member_json_path = os.path.join(members_data_dir, f"{member_id}.json")
 
-    #         # Force re-extraction by removing existing JSON file (if desired)
-    #         # if os.path.exists(member_json_path):
-    #         #     os.remove(member_json_path)
-    #         #     print(f"Removed existing '{member_json_path}' to force re-extraction.")
+            # Force re-extraction by removing existing JSON file (if desired)
+            # if os.path.exists(member_json_path):
+            #     os.remove(member_json_path)
+            #     print(f"Removed existing '{member_json_path}' to force re-extraction.")
 
-    #         if not check_file_exists(member_json_path, f"Member {member_id} Info JSON"):
-    #             if not run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_md_path, member_json_path],
-    #                                f"Extracting info for member {member_id}"):
-    #                 all_members_extracted = False
-    #                 break
+            if not check_file_exists(member_json_path, f"Member {member_id} Info JSON"):
+                if not run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, member_json_path, family_id],
+                                   f"Extracting info for member {member_id}"):
+                    all_members_extracted = False
+                    break
 
-    #     if not all_members_extracted:
-    #         return False
+        if not all_members_extracted:
+            return False
 
     print(f"\nPipeline completed successfully for Family ID: {family_id}")
     return True
