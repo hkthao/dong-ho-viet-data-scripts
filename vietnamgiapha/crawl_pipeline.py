@@ -43,10 +43,48 @@ async def crawl_pipeline(family_id: str):
     print(f"\nCrawling pipeline completed successfully for Family ID: {family_id}")
     return True
 
+async def run_crawl_pipeline_for_range(start_id: int, end_id: int):
+    failed_crawls = []
+
+    for i in range(start_id, end_id + 1):
+        family_id = str(i)
+        print(f"--- Đang xử lý Family ID: {family_id} để thu thập dữ liệu ---")
+        try:
+            success = await crawl_pipeline(family_id)
+            if not success:
+                failed_crawls.append(family_id)
+                print(f"Thất bại khi thu thập dữ liệu Family ID: {family_id}")
+        except Exception as e:
+            failed_crawls.append(family_id)
+            print(f"Có lỗi xảy ra khi thu thập dữ liệu Family ID: {family_id}: {e}")
+        print(f"--- Đã hoàn tất xử lý Family ID: {family_id} để thu thập dữ liệu ---\n")
+
+    if failed_crawls:
+        print(f"\n--- Tóm tắt: Thất bại khi thu thập dữ liệu {len(failed_crawls)} Family ID ---")
+        print(f"Các Family ID thất bại: {', '.join(failed_crawls)}")
+        return False
+    else:
+        print("\n--- Tóm tắt: Tất cả Family ID đã được thu thập dữ liệu thành công ---")
+        return True
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python crawl_pipeline.py <family_id>")
+    if len(sys.argv) == 2:
+        target_family_id = sys.argv[1]
+        asyncio.run(crawl_pipeline(target_family_id))
+    elif len(sys.argv) == 3:
+        try:
+            start_id = int(sys.argv[1])
+            end_id = int(sys.argv[2])
+            if start_id > end_id:
+                print("Lỗi: start_id không được lớn hơn end_id.")
+                sys.exit(1)
+            asyncio.run(run_crawl_pipeline_for_range(start_id, end_id))
+        except ValueError:
+            print("Lỗi: start_id và end_id phải là số nguyên.")
+            print("Cách dùng: python crawl_pipeline.py <family_id>")
+            print("       python crawl_pipeline.py <start_id> <end_id>")
+            sys.exit(1)
+    else:
+        print("Cách dùng: python crawl_pipeline.py <family_id>")
+        print("       python crawl_pipeline.py <start_id> <end_id>")
         sys.exit(1)
-    
-    target_family_id = sys.argv[1]
-    asyncio.run(crawl_pipeline(target_family_id))
