@@ -62,3 +62,14 @@ def remove_html_tags(html_content: str) -> str:
     soup = BeautifulSoup(html_content, 'lxml')
     return soup.get_text(separator=' ', strip=True)
 
+def remove_specific_html_tags(html_content: str, tags_to_unwrap: list) -> str:
+    """
+    Removes specified HTML tags from the given HTML content while keeping their text content.
+    """
+    soup = BeautifulSoup(html_content, 'lxml')
+    for tag_name in tags_to_unwrap:
+        for tag in soup.find_all(tag_name):
+            tag.unwrap()
+    return str(soup)
+
+

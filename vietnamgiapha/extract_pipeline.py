@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 
-from utils import run_command, check_file_exists, check_directory_not_empty
+from utils import run_command, check_file_exists
 
 # Define the paths for scripts
 EXTRACT_GIAPHA_INFO_SCRIPT = "vietnamgiapha/extract_giapha_info_ollama.py"
@@ -52,7 +52,7 @@ async def extract_pipeline(family_id: str, limit: int = None):
             member_json_path = os.path.join(members_data_dir, f"{member_id}.json")
 
             if not check_file_exists(member_json_path, f"Member {member_id} Info JSON"):
-                task = run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, member_json_path, family_id],
+                task = run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, family_id],
                                    f"Extracting info for member {member_id}")
                 tasks.append(task)
         

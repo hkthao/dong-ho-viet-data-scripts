@@ -2,7 +2,7 @@ import json
 import sys
 import requests
 import os
-from utils import remove_html_tag_attributes # Import the utility function
+from utils import remove_html_tag_attributes, remove_specific_html_tags # Import the utility function
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 
@@ -12,6 +12,8 @@ def extract_info_with_ollama(html_content: str, model_name: str):
     """
     # Clean the HTML content by removing all tag attributes
     cleaned_html_content = remove_html_tag_attributes(html_content)
+    # Further clean by removing specific tags (a, b, i) while keeping their text content
+    cleaned_html_content = remove_specific_html_tags(cleaned_html_content, ['a', 'b', 'i'])
 
     prompt = f"""Bạn là một chuyên gia phân tích dữ liệu gia phả. Nhiệm vụ của bạn là trích xuất thông tin từ nội dung HTML được cung cấp về thông tin chung của gia phả.
 Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân thủ chính xác cấu trúc và các trường sau:
@@ -27,13 +29,9 @@ Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân
   "contactInfo": "string", // Thông tin liên hệ (tùy chọn)
   "avatarBase64": "string", // Ảnh đại diện dạng Base64 (tùy chọn)
   "visibility": "Private", // Chế độ hiển thị (mặc định là "Private", có thể là "Public")
-  "managerIds": [ // Danh sách ID người quản lý (kiểu GUID, tùy chọn)
-    "00000000-0000-0000-0000-000000000000"
-  ],
-  "viewerIds": [ // Danh sách ID người xem (kiểu GUID, tùy chọn)
-    "00000000-0000-0000-0000-000000000000"
-  ],
-  "locationId": "00000000-0000-0000-0000-000000000000" // ID địa điểm (kiểu GUID, tùy chọn)
+  "managerIds": [],
+  "viewerIds": [],
+  "locationId": "" // ID địa điểm (kiểu GUID, tùy chọn)
 }}
 
 Nếu không tìm thấy thông tin cho một trường nào đó, hãy sử dụng giá trị `null` hoặc một chuỗi/mảng rỗng phù hợp với kiểu dữ liệu của trường đó.

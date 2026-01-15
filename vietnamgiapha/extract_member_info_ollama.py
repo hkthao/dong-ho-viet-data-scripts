@@ -2,7 +2,7 @@ import json
 import sys
 import requests
 import os
-from utils import remove_html_tags # Import the utility function
+from utils import remove_html_tag_attributes # Import the utility function
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:8b") # Default model, can be overridden
@@ -12,7 +12,7 @@ def extract_info_with_ollama(html_content: str, family_id: str, member_id: str):
     Sends HTML content to Ollama for structured data extraction according to schema-member.txt.
     """
     # Clean the HTML content by removing all tags
-    cleaned_html_content = remove_html_tags(html_content)
+    cleaned_html_content = remove_html_tag_attributes(html_content)
 
     prompt = f"""You are a genealogy data analysis expert. Your task is to extract information about a family member from the provided HTML content.
 Extract the following information and return it as a JSON object, strictly adhering to the following structure and fields. For the "code" field, format it as "GPVN-M-{family_id}-{member_id}".
@@ -37,8 +37,8 @@ Extract the following information and return it as a JSON object, strictly adher
   "biography": "string", // Biography (Career, merits, notes)
   "isRoot": "boolean", // Is the progenitor (true/false)
   "isDeceased": "boolean", // Is deceased (true/false)
-  "order": "integer", // Child order (e.g., 1)
-  "generation": "integer", // Generation number (e.g., 0, 1, 2,...)
+  "order": "integer", // Thứ tự con cái. Nếu không đề cập trong HTML, để giá trị 0.
+  "generation": "integer", // Số đời (ví dụ: từ "Đời thứ: 10" hãy trích xuất số 10). Nếu không tìm thấy, để giá trị null.
   "father": {{ // Father's information, null if not available
     "lastName": "string",
     "firstName": "string",
@@ -114,12 +114,10 @@ Return ONLY valid JSON, with no additional text.
         sys.exit(1)
 
 
-OUTPUT_BASE_DIR = "output/data/members"
-
 def extract_member_info_ollama(html_file_path: str, family_id: str):
     member_id = os.path.basename(html_file_path).replace('.html', '')
     
-    output_dir = os.path.join(OUTPUT_BASE_DIR, family_id)
+    output_dir = os.path.join("output", family_id, 'data', 'members')
     os.makedirs(output_dir, exist_ok=True)
     output_json_file_path = os.path.join(output_dir, f"{member_id}.json")
 
