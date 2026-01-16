@@ -51,13 +51,7 @@ Extract the following information and return it as a JSON object, strictly adher
     "code": "string",
     "gender": "string"
   }},
-  "husband": {{ // Husband's information, null if not available
-    "lastName": "string",
-    "firstName": "string",
-    "code": "string",
-    "gender": "string"
-  }},
-  "wife": [ // Array of wife objects, empty array if not available
+  "spouses": [ // Mảng các đối tác hôn nhân (vợ/chồng). Nếu có nhiều vợ/chồng, hãy đưa tất cả vào mảng này. Mảng rỗng nếu không có.
     {{
       "lastName": "string",
       "firstName": "string",

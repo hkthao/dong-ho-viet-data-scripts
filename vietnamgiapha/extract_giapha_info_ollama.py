@@ -36,6 +36,8 @@ Hãy trích xuất các thông tin sau và trả về dưới dạng JSON, tuân
 
 Nếu không tìm thấy thông tin cho một trường nào đó, hãy sử dụng giá trị `null` hoặc một chuỗi/mảng rỗng phù hợp với kiểu dữ liệu của trường đó.
 
+Lưu ý quan trọng: KHÔNG trích xuất bất kỳ thông tin nào từ các phần có tiêu đề "Các anh em, dâu rể:" và "Con cái:". Bỏ qua hoàn toàn các phần này.
+
 Nội dung HTML:
 ---
 {cleaned_html_content}

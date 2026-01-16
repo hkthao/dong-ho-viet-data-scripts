@@ -45,28 +45,21 @@ async def extract_pipeline(family_id: str, limit: int = None):
             member_html_files = member_html_files[:limit]
             print(f"Limiting member extraction to {limit} files.")
 
-        tasks = []
+        
         for member_html_filename in member_html_files:
             member_id = member_html_filename.replace('.html', '')
             member_html_path = os.path.join(members_raw_html_dir, member_html_filename)
             member_json_path = os.path.join(members_data_dir, f"{member_id}.json")
 
             if not check_file_exists(member_json_path, f"Member {member_id} Info JSON"):
-                task = run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, family_id],
-                                   f"Extracting info for member {member_id}")
-                tasks.append(task)
-        
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    print(f"Error processing member {member_html_files[i].replace('.html', '')}: {result}", file=sys.stderr)
-                    return False # Return False if any task raised an exception
-                elif not result:
-                    print(f"Extraction failed for member {member_html_files[i].replace('.html', '')}", file=sys.stderr)
-                    return False # Return False if any task explicitly returned False
-        else:
-            print("All member JSON files already exist or no members to process.")
+                result = await run_command(["python3", EXTRACT_MEMBER_INFO_SCRIPT, member_html_path, family_id],
+                                           f"Extracting info for member {member_id}")
+                if not result:
+                    print(f"Extraction failed for member {member_id}", file=sys.stderr)
+                    return False
+            else:
+                print(f"Member {member_id} JSON file already exists. Skipping.")
+        print("Hoàn thành trích xuất thông tin thành viên.")
 
     print(f"\nExtraction pipeline completed successfully for Family ID: {family_id}")
     return True

@@ -5,10 +5,10 @@ Dự án này là một tập hợp các script Python được thiết kế đ�
 
 ## Tính năng chính
 *   **Thu thập dữ liệu gia phả**: Tự động truy cập và tải về các trang HTML chứa thông tin gia phả của từng gia đình và từng thành viên.
-*   **Xử lý lỗi mạnh mẽ**: Xử lý các trường hợp trang HTML lỗi hoặc trống, với cơ chế dự phòng để thu thập dữ liệu thành viên theo dải ID.
-*   **Làm sạch dữ liệu HTML**: Loại bỏ các thẻ và thuộc tính HTML không cần thiết để có được dữ liệu sạch hơn cho việc trích xuất.
-*   **Trích xuất thông tin**: Sử dụng các công cụ (ví dụ: Ollama) để trích xuất thông tin có cấu trúc từ các trang HTML đã thu thập.
-*   **Hỗ trợ chạy theo ID hoặc dải ID**: Cho phép người dùng chỉ định một ID gia đình cụ thể hoặc một dải ID gia đình để xử lý.
+*   **Xử lý lỗi mạnh mẽ**: Xử lý các trường hợp trang HTML lỗi hoặc trống. Có cơ chế dự phòng để thu thập dữ liệu thành viên theo dải ID và tự động bỏ qua xử lý nếu gặp quá nhiều lỗi liên tiếp (100 lỗi) ở cả cấp độ family_id và thành viên.
+*   **Làm sạch dữ liệu HTML**: Loại bỏ các thẻ và thuộc tính HTML không cần thiết, bao gồm các thẻ `<a>`, `<b>`, `<i>`, để có được dữ liệu sạch hơn cho việc trích xuất.
+*   **Trích xuất thông tin**: Sử dụng các công cụ (ví dụ: Ollama) để trích xuất thông tin có cấu trúc từ các trang HTML đã thu thập, với hướng dẫn chi tiết cho LLM về các trường như "generation" và "order".
+*   **Hỗ trợ chạy theo ID hoặc dải ID**: Cho phép người dùng chỉ định một ID gia đình cụ thể hoặc một dải ID gia đình để xử lý cho cả quá trình thu thập và trích xuất, kèm theo tùy chọn giới hạn số lượng thành viên cần trích xuất.
 
 ## Cấu trúc dự án
 *   `apis/`: Mô tả các API liên quan đến Family Tree.
@@ -85,6 +85,22 @@ Sử dụng `crawl_pipeline.py` để chỉ thu thập dữ liệu HTML:
     ```bash
     python3 vietnamgiapha/crawl_pipeline.py <start_id> <end_id>
     # Ví dụ: python3 vietnamgiapha/crawl_pipeline.py 1 12000
+    ```
+
+### 3. Chỉ chạy pipeline trích xuất dữ liệu (extraction)
+Sử dụng `extract_pipeline.py` để chỉ trích xuất dữ liệu từ HTML đã thu thập:
+
+*   **Cho một Family ID cụ thể**:
+    ```bash
+    python3 vietnamgiapha/extract_pipeline.py <family_id> [limit]
+    # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1714
+    # Ví dụ với giới hạn 10 thành viên: python3 vietnamgiapha/extract_pipeline.py 1714 10
+    ```
+*   **Cho một dải Family ID**:
+    ```bash
+    python3 vietnamgiapha/extract_pipeline.py <start_id> <end_id> [limit]
+    # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1 100
+    # Ví dụ với giới hạn 10 thành viên cho mỗi gia đình: python3 vietnamgiapha/extract_pipeline.py 1 100 10
     ```
 
 ## Đóng góp
