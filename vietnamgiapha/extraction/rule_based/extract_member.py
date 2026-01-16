@@ -1,3 +1,4 @@
+import os # Added os import
 import json
 import re
 from bs4 import BeautifulSoup
@@ -92,11 +93,12 @@ def extract_first_name(full_name):
     parts = full_name.strip().split(maxsplit=1)
     return parts[1] if len(parts) > 1 else ""
 
-def generate_member_code(lastName, gender, generation, order):
-    """Tạo mã thành viên dựa trên thông tin."""
-    # This is a placeholder. The task implies this might be needed but doesn't specify logic.
-    # For now, it will return a simple concatenation.
-    return f"GPVN-M-{generation}-{lastName[:2].upper()}-{order}"
+def generate_member_code(family_id, member_filename, lastName, gender, generation, order):
+    """Tạo mã thành viên dựa trên thông tin gia đình và tên tệp."""
+    # New format: GPVN-{family_id}-{member_filename_without_extension}
+    # This function is for the main member's code.
+    member_id_from_filename = os.path.splitext(member_filename)[0]
+    return f"GPVN-{family_id}-{member_id_from_filename}"
 
 def extract_text_after_colon(text):
     """Trích xuất văn bản sau dấu hai chấm đầu tiên."""
@@ -123,7 +125,7 @@ def parse_stub_member(name_text):
         "code": None
     }
 
-def parse_family_html(html_content):
+def parse_family_html(html_content, family_id, member_filename):
     """Phân tích HTML gia phả và trả về JSON theo schema."""
     soup = BeautifulSoup(html_content, "lxml")
     rows = soup.find_all("tr")
@@ -260,7 +262,13 @@ def parse_family_html(html_content):
                     output["spouses"].append(current_spouse)
 
                 name_gender_info = parse_name_gender(value)
+                # Increment spouse_count to generate unique ID
+                spouse_count = len(output["spouses"]) + 1
+                member_id_from_filename = os.path.splitext(member_filename)[0]
+                spouse_id = f"GPVN-{family_id}-{member_id_from_filename}-S{spouse_count}"
+                
                 current_spouse = {
+                    "id": spouse_id, # Added spouse ID
                     "lastName": name_gender_info["lastName"],
                     "firstName": name_gender_info["firstName"],
                     "gender": name_gender_info["gender"],
@@ -283,7 +291,15 @@ def parse_family_html(html_content):
 
         
     # After the loop, if there's a current_spouse that hasn't been added, add it.
+    # Also ensure spouse_count is correctly incremented for the last spouse if it was just created.
     if current_spouse is not None and (current_spouse["lastName"] or current_spouse["firstName"]):
+        # Check if the last current_spouse object was already added by a previous 'Tên' label
+        # or if it's a new one that needs to be appended.
+        # A simpler check: if the ID is not yet set, append it.
+        if "id" not in current_spouse:
+            spouse_count = len(output["spouses"]) + 1
+            member_id_from_filename = os.path.splitext(member_filename)[0]
+            current_spouse["id"] = f"GPVN-{family_id}-{member_id_from_filename}-S{spouse_count}"
         output["spouses"].append(current_spouse)
 
     # 7.9 Father - If "Là con của" was not found, then it's a root.
@@ -293,6 +309,8 @@ def parse_family_html(html_content):
     # 9. Sinh code (nếu cần)
     if output["lastName"] and output["firstName"] and output["gender"] and output["generation"] is not None and output["order"] is not None:
         output["code"] = generate_member_code(
+            family_id=family_id,
+            member_filename=member_filename,
             lastName=output["lastName"],
             gender=output["gender"],
             generation=output["generation"],

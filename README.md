@@ -102,20 +102,44 @@ Sử dụng `crawl_pipeline.py` để chỉ thu thập dữ liệu HTML:
     # Ví dụ: python3 vietnamgiapha/crawl_pipeline.py 1 12000
     ```
 
-### 3. Chỉ chạy pipeline trích xuất dữ liệu (extraction)
-Sử dụng `extract_pipeline.py` để chỉ trích xuất dữ liệu từ HTML đã thu thập:
+### 3.1. Chỉ chạy pipeline trích xuất dữ liệu (Rule-based Extraction - `extract_pipeline_rulebase.py`)
+Sử dụng `extract_pipeline_rulebase.py` để chỉ trích xuất dữ liệu từ HTML đã thu thập:
+
+*   **Cho một Family ID cụ thể**:
+    ```bash
+    PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --family_id <family_id> [--force]
+    # Ví dụ: PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --family_id 1714 --force
+    ```
+*   **Cho một dải Family ID**:
+    ```bash
+    PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --start_id <start_id> --end_id <end_id> [--force]
+    # Ví dụ: PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --start_id 1 --end_id 12000 --force
+    ```
+*   **Với giới hạn số lượng thư mục (chỉ áp dụng khi không dùng --family_id hoặc --start_id/--end_id)**:
+    ```bash
+    PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --limit <số_lượng> [--force]
+    # Ví dụ: PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --limit 100 --force
+    ```
+*   **Xử lý tất cả thư mục gia đình**:
+    ```bash
+    PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output [--force]
+    # Ví dụ: PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --force
+    ```
+
+### 3.2. Chỉ chạy pipeline trích xuất dữ liệu (LLM-based Extraction - `extract_pipeline.py`)
+Sử dụng `extract_pipeline.py` để chỉ trích xuất dữ liệu từ HTML đã thu thập (sử dụng các script trích xuất dựa trên LLM):
 
 *   **Cho một Family ID cụ thể**:
     ```bash
     python3 vietnamgiapha/pipelines/extract_pipeline.py <family_id> [limit]
-    # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1714
-    # Ví dụ với giới hạn 10 thành viên: python3 vietnamgiapha/extract_pipeline.py 1714 10
+    # Ví dụ: python3 vietnamgiapha/pipelines/extract_pipeline.py 1714
+    # Ví dụ với giới hạn 10 thành viên: python3 vietnamgiapha/pipelines/extract_pipeline.py 1714 10
     ```
 *   **Cho một dải Family ID**:
     ```bash
-    python3 vietnamgiapha/pipelines/extract_pipeline.py <start_id> <end_id> [limit]
-    # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1 100
-    # Ví dụ với giới hạn 10 thành viên cho mỗi gia đình: python3 vietnamgiapha/extract_pipeline.py 1 100 10
+    # Hiện tại không hỗ trợ trực tiếp dải ID thông qua script này.
+    # Bạn cần lặp qua các ID bằng script bash/shell bên ngoài hoặc sửa đổi script.
+    # Ví dụ: for i in {1..100}; do python3 vietnamgiapha/pipelines/extract_pipeline.py $i; done
     ```
 
 ## Đóng góp

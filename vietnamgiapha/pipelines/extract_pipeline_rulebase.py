@@ -13,6 +13,12 @@ def main():
                         help="Limit the number of family folders to process for testing purposes.")
     parser.add_argument("--force", action="store_true",
                         help="Force reprocessing even if output JSON files already exist.")
+    parser.add_argument("--family_id", type=str,
+                        help="Process only a specific family ID (e.g., '1691'). Overrides --limit if provided.")
+    parser.add_argument("--start_id", type=int,
+                        help="Start processing from this family ID (inclusive). Requires --end_id.")
+    parser.add_argument("--end_id", type=int,
+                        help="End processing at this family ID (inclusive). Requires --start_id.")
     args = parser.parse_args()
 
     # Resolve absolute path for the output base directory
@@ -20,13 +26,33 @@ def main():
 
     processed_count = 0
     
-    # Iterate through all entries in the output_base_dir
-    for entry_name in sorted(os.listdir(output_base_path)):
-        family_folder_path = os.path.join(output_base_path, entry_name)
+    # Get list of family folders to process
+    family_folders_to_process = []
+    if args.family_id:
+        specific_family_folder_path = os.path.join(output_base_path, args.family_id)
+        if os.path.isdir(specific_family_folder_path):
+            family_folders_to_process.append(args.family_id)
+        else:
+            print(f"Lỗi: Không tìm thấy thư mục gia đình '{args.family_id}' tại '{output_base_path}'.")
+            return
+    elif args.start_id is not None and args.end_id is not None:
+        if args.start_id > args.end_id:
+            print("Lỗi: --start_id phải nhỏ hơn hoặc bằng --end_id.")
+            return
+        
+        for i in range(args.start_id, args.end_id + 1):
+            folder_name = str(i)
+            family_folder_path = os.path.join(output_base_path, folder_name)
+            if os.path.isdir(family_folder_path):
+                family_folders_to_process.append(folder_name)
+            # else: We don't print a warning here, as it's expected that not all IDs in a range might exist.
+    else: # Process all folders if no specific family_id or range is provided
+        for entry_name in sorted(os.listdir(output_base_path)):
+            if os.path.isdir(os.path.join(output_base_path, entry_name)) and entry_name.isdigit():
+                family_folders_to_process.append(entry_name)
 
-        # Check if it's a directory and represents a family folder (e.g., named '1', '10', etc.)
-        if not os.path.isdir(family_folder_path) or not entry_name.isdigit():
-            continue
+    for entry_name in family_folders_to_process:
+        family_folder_path = os.path.join(output_base_path, entry_name)
 
         if args.limit and processed_count >= args.limit:
             print(f"Đã đạt đến giới hạn {args.limit} thư mục. Dừng xử lý.")
@@ -117,7 +143,11 @@ def main():
                             with open(member_html_file_path, "r", encoding="utf-8") as f:
                                 member_html_content = f.read()
                             
-                            member_data_json_str = extract_member.parse_family_html(member_html_content)
+                            member_data_json_str = extract_member.parse_family_html(
+                                member_html_content, 
+                                family_id=entry_name, 
+                                member_filename=member_html_filename
+                            )
                             member_data = json.loads(member_data_json_str)
 
                             final_member_output_json_file = os.path.join(members_output_data_dir, f"{base_member_name}.json")

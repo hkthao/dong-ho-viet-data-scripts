@@ -56,13 +56,14 @@ def extract_data(html_file_path):
         main_person_name = parts[0]
         spouses = []
         if len(parts) > 1:
-            for spouse_name_raw in parts[1:]:
+            for spouse_index, spouse_name_raw in enumerate(parts[1:]):
+                spouse_id = f"{full_id}-S{spouse_index + 1}" # Generate unique ID for spouse
                 # Check for role in parentheses, e.g., "Tô Thị Xuyến (Chính thất)"
                 spouse_match = re.match(r'(.+?)\s*\((.+?)\)', spouse_name_raw)
                 if spouse_match:
-                    spouses.append({"name": spouse_match.group(1).strip(), "role": spouse_match.group(2).strip()})
+                    spouses.append({"id": spouse_id, "name": spouse_match.group(1).strip(), "role": spouse_match.group(2).strip()})
                 else:
-                    spouses.append({"name": spouse_name_raw.strip()})
+                    spouses.append({"id": spouse_id, "name": spouse_name_raw.strip()})
         
         persons_in_order.append({
             "id": full_id,
