@@ -99,7 +99,7 @@ def main():
                 phaky_data = extract_family.extract_phaky(phaky_html_content)
                 tocuoc_data = extract_family.extract_tocuoc(tocuoc_html_content)
                 
-                final_family_data = extract_family.build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data)
+                final_family_data = extract_family.build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data, entry_name)
 
                 with open(family_output_json_file, 'w', encoding='utf-8') as f:
                     json.dump(final_family_data, f, ensure_ascii=False, indent=2)

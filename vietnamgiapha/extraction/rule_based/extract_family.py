@@ -38,10 +38,9 @@ def extract_overview(html: str) -> dict:
         font_tag = name_div.find('font', {'color': '#ff0000', 'size': '6'})
         if font_tag:
             # The name is usually after a <br/> tag within this font tag
-            br_tag = font_tag.find('br')
-            if br_tag:
-                # Get the text after the <br/>
-                name_text = br_tag.next_sibling
+            br_tag = font_tag.find('br') # Keep this to check for its existence
+            if font_tag:
+                name_text = font_tag.get_text(separator=' ', strip=True)
                 if name_text:
                     result["name"] = clean_text(name_text)
 
@@ -246,12 +245,12 @@ def extract_tocuoc(html: str) -> dict:
 
     return result
 
-def build_schema(overview: dict, progenitor: dict, phaky: dict, tocuoc: dict) -> dict:
+def build_schema(overview: dict, progenitor: dict, phaky: dict, tocuoc: dict, folder_name: str) -> dict:
     """Combines extracted data into the final schema."""
     final_output = FINAL_OUTPUT_SCHEMA.copy()
 
     final_output["name"] = overview.get("name", "")
-    final_output["code"] = re.sub(r"\s+", "-", overview.get("name", "").lower()) if overview.get("name") else ""
+    final_output["code"] = f"GPVN-{folder_name}"
     final_output["description"] = overview.get("description", "")
     final_output["address"] = overview.get("address", "")
     
@@ -309,7 +308,7 @@ if __name__ == "__main__":
     phaky_data = extract_phaky(phaky_html_content)
     tocuoc_data = extract_tocuoc(tocuoc_html_content)
     
-    final_family_data = build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data)
+    final_family_data = build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data, "sample")
 
     output_json_path = os.path.join(output_dir, "family_data.json")
     with open(output_json_path, "w", encoding="utf-8") as json_f:

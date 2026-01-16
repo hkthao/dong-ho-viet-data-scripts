@@ -93,12 +93,20 @@ def extract_first_name(full_name):
     parts = full_name.strip().split(maxsplit=1)
     return parts[1] if len(parts) > 1 else ""
 
-def generate_member_code(family_id, member_filename, lastName, gender, generation, order):
-    """Tạo mã thành viên dựa trên thông tin gia đình và tên tệp."""
-    # New format: GPVN-{family_id}-{member_filename_without_extension}
-    # This function is for the main member's code.
-    member_id_from_filename = os.path.splitext(member_filename)[0]
-    return f"GPVN-{family_id}-{member_id_from_filename}"
+def generate_member_code(folder_name, member_filename):
+    """Tạo mã thành viên dựa trên folder_name và member_filename.
+    Format: GPVN-{folder_name}-{member_suffix_from_filename}
+    Ví dụ: GPVN-1-1 (nếu folder_name là '1' và member_filename là 'GPVN-1691-1.json')
+    """
+    member_id_parts = os.path.splitext(member_filename)[0].split('-') # e.g., ["GPVN", "1691", "1"]
+    member_suffix = ""
+    if len(member_id_parts) >= 3:
+        member_suffix = member_id_parts[2] # "1" from "GPVN-1691-1"
+    else:
+        # Fallback if filename format is unexpected, take the whole name after GPVN-
+        member_suffix = os.path.splitext(member_filename)[0].replace("GPVN-", "")
+
+    return f"GPVN-{folder_name}-{member_suffix}"
 
 def extract_text_after_colon(text):
     """Trích xuất văn bản sau dấu hai chấm đầu tiên."""
@@ -193,17 +201,20 @@ def parse_family_html(html_content, family_id, member_filename):
 
         # Handle "Là con của" if it appears in the FAMILY section (before PERSON starts)
         if current_section == "FAMILY" and "Là con của" in label:
-            output["isRoot"] = False
-            # Extract the name after "Là con của:"
-            name_part = label.split("Là con của:", 1)[-1].strip()
+            name_part = extract_text_after_colon(label) # Use helper for cleaner extraction
             
-            father_info = parse_name_gender(name_part)
-            output["father"] = {
-                "lastName": father_info["lastName"],
-                "firstName": father_info["firstName"],
-                "code": None,
-                "gender": "Nam"
-            }
+            if "Thuỷ tổ".lower() in name_part.lower() or "Thủy tổ".lower() in name_part.lower(): # Check for both "Thuỷ tổ" and "Thủy tổ"
+                output["isRoot"] = True
+                output["father"] = None # If it's the progenitor, it doesn't have a father in the tree structure
+            else:
+                output["isRoot"] = False
+                father_info = parse_name_gender(name_part)
+                output["father"] = {
+                    "lastName": father_info["lastName"],
+                    "firstName": father_info["firstName"],
+                    "code": None,
+                    "gender": "Nam"
+                }
         
         # Now process fields specific to the current_section
         if current_section == "PERSON":
@@ -264,11 +275,19 @@ def parse_family_html(html_content, family_id, member_filename):
                 name_gender_info = parse_name_gender(value)
                 # Increment spouse_count to generate unique ID
                 spouse_count = len(output["spouses"]) + 1
-                member_id_from_filename = os.path.splitext(member_filename)[0]
-                spouse_id = f"GPVN-{family_id}-{member_id_from_filename}-S{spouse_count}"
+                
+                # Extract member_suffix from member_filename (e.g., "1" from "GPVN-1691-1.json")
+                member_id_parts = os.path.splitext(member_filename)[0].split('-')
+                member_suffix = ""
+                if len(member_id_parts) >= 3:
+                    member_suffix = member_id_parts[2]
+                else:
+                    member_suffix = os.path.splitext(member_filename)[0].replace("GPVN-", "")
+
+                spouse_code = f"GPVN-{family_id}-{member_suffix}-S{spouse_count}" # family_id here is the folder_name
                 
                 current_spouse = {
-                    "id": spouse_id, # Added spouse ID
+                    "code": spouse_code, # Changed from 'id' to 'code'
                     "lastName": name_gender_info["lastName"],
                     "firstName": name_gender_info["firstName"],
                     "gender": name_gender_info["gender"],
@@ -295,11 +314,19 @@ def parse_family_html(html_content, family_id, member_filename):
     if current_spouse is not None and (current_spouse["lastName"] or current_spouse["firstName"]):
         # Check if the last current_spouse object was already added by a previous 'Tên' label
         # or if it's a new one that needs to be appended.
-        # A simpler check: if the ID is not yet set, append it.
-        if "id" not in current_spouse:
+        # A simpler check: if the CODE is not yet set, append it.
+        if "code" not in current_spouse:
             spouse_count = len(output["spouses"]) + 1
-            member_id_from_filename = os.path.splitext(member_filename)[0]
-            current_spouse["id"] = f"GPVN-{family_id}-{member_id_from_filename}-S{spouse_count}"
+            
+            # Extract member_suffix from member_filename (e.g., "1" from "GPVN-1691-1.json")
+            member_id_parts = os.path.splitext(member_filename)[0].split('-')
+            member_suffix = ""
+            if len(member_id_parts) >= 3:
+                member_suffix = member_id_parts[2]
+            else:
+                member_suffix = os.path.splitext(member_filename)[0].replace("GPVN-", "")
+            
+            current_spouse["code"] = f"GPVN-{family_id}-{member_suffix}-S{spouse_count}"
         output["spouses"].append(current_spouse)
 
     # 7.9 Father - If "Là con của" was not found, then it's a root.
@@ -309,12 +336,8 @@ def parse_family_html(html_content, family_id, member_filename):
     # 9. Sinh code (nếu cần)
     if output["lastName"] and output["firstName"] and output["gender"] and output["generation"] is not None and output["order"] is not None:
         output["code"] = generate_member_code(
-            family_id=family_id,
-            member_filename=member_filename,
-            lastName=output["lastName"],
-            gender=output["gender"],
-            generation=output["generation"],
-            order=output["order"]
+            folder_name=family_id, # family_id in parse_family_html is the folder_name
+            member_filename=member_filename
         )
 
     # Ensure mother is null
