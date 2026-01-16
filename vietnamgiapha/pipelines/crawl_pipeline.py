@@ -2,11 +2,11 @@ import asyncio
 import os
 import sys
 
-from utils import run_command, check_file_exists
-from crawl_member_details import crawl_member_details
+from ..utils.utils import run_command, check_file_exists
+from ..crawling.crawl_member_details import crawl_member_details
 
 # Define the paths for scripts
-CRAWL_GIAPHA_SCRIPT = "vietnamgiapha/crawl_giapha.py"
+CRAWL_GIAPHA_SCRIPT = "vietnamgiapha/crawling/crawl_giapha.py"
 
 async def crawl_pipeline(family_id: str):
     print(f"Starting crawling pipeline for Family ID: {family_id}")

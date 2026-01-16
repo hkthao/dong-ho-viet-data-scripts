@@ -2,8 +2,8 @@ import os
 import sys
 import asyncio
 
-from crawl_pipeline import crawl_pipeline
-from extract_pipeline import extract_pipeline
+from .crawl_pipeline import crawl_pipeline
+from .extract_pipeline import extract_pipeline
 
 async def main_pipeline(family_id: str):
     print(f"Starting main pipeline for Family ID: {family_id}")

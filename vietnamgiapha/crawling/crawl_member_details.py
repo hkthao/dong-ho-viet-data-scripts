@@ -4,7 +4,7 @@ import os
 import sys
 from bs4 import BeautifulSoup
 import re
-from utils import check_file_exists
+from ..utils.utils import check_file_exists
 
 def _clean_member_html(html_content: str) -> str:
     """

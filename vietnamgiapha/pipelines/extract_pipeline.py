@@ -2,11 +2,11 @@ import os
 import sys
 import asyncio
 
-from utils import run_command, check_file_exists
+from ..utils.utils import run_command, check_file_exists
 
 # Define the paths for scripts
-EXTRACT_GIAPHA_INFO_SCRIPT = "vietnamgiapha/extract_giapha_info_ollama.py"
-EXTRACT_MEMBER_INFO_SCRIPT = "vietnamgiapha/extract_member_info_ollama.py"
+EXTRACT_GIAPHA_INFO_SCRIPT = "vietnamgiapha/extraction/llm_based/extract_family_ollama.py"
+EXTRACT_MEMBER_INFO_SCRIPT = "vietnamgiapha/extraction/llm_based/extract_member_ollama.py"
 
 async def extract_pipeline(family_id: str, limit: int = None):
     print(f"Starting extraction pipeline for Family ID: {family_id}")

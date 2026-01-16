@@ -2,7 +2,7 @@ import json
 import sys
 import requests
 import os
-from utils import remove_html_tag_attributes, remove_specific_html_tags # Import the utility function
+from ..utils.utils import remove_html_tag_attributes, remove_specific_html_tags # Import the utility function
 
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 
