@@ -298,18 +298,61 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
 
     # Sau khi thành viên chính đã được tạo hoặc tìm thấy, thu thập thông tin quan hệ để cập nhật ở Lượt 2
     # Cha/mẹ và vợ/chồng sẽ được xử lý ở lượt cập nhật thứ 2.
-    resolved_father_code = None # Luôn là None trong lượt tạo đầu tiên
-    resolved_mother_code = None # Luôn là None trong lượt tạo đầu tiên
+    resolved_father_code = (member_data.get("father") or {}).get("code")
+    resolved_mother_code = (member_data.get("mother") or {}).get("code")
+
+    # NEW LOGIC FOR MOTHER_CODE INFERENCE
+    if resolved_mother_code is None and resolved_father_code:
+        # Avoid self-reference for father
+        if resolved_father_code == member_code:
+            logging.debug(f"Thành viên '{member_code}' là thủy tổ (cha là chính mình). Bỏ qua suy luận mẹ từ vợ/chồng của cha.")
+        else:
+            # Parse father_code to get folder_name and member_filename
+            try:
+                # Example: GPVN-1-1 -> folder_name = "1", member_filename = "1"
+                parts = resolved_father_code.split('-')
+                if len(parts) >= 3 and parts[0] == 'GPVN':
+                    father_folder_name = parts[1]
+                    father_member_filename = parts[2] # Assuming member_filename is just the index
+
+                    father_member_json_path = os.path.join(
+                        OUTPUT_DIR,
+                        father_folder_name,
+                        "data",
+                        "members",
+                        f"{father_member_filename}.json"
+                    )
+
+                    if os.path.exists(father_member_json_path):
+                        with open(father_member_json_path, 'r', encoding='utf-8') as f:
+                            father_member_data = json.load(f)
+
+                        father_spouses = father_member_data.get("spouses")
+                        if father_spouses and isinstance(father_spouses, list) and len(father_spouses) > 0:
+                            # Take the code of the first spouse
+                            inferred_mother_code = father_spouses[0].get("code")
+                            if inferred_mother_code:
+                                resolved_mother_code = inferred_mother_code
+                                logging.info(f"Suy luận 'mother_code': '{resolved_mother_code}' cho thành viên '{member_code}' từ người phối ngẫu đầu tiên của cha '{resolved_father_code}'.")
+                            else:
+                                logging.warning(f"Người phối ngẫu đầu tiên của cha '{resolved_father_code}' không có 'code'. Không thể suy luận 'mother_code' cho thành viên '{member_code}'.")
+                        else:
+                            logging.warning(f"Cha '{resolved_father_code}' không có thông tin người phối ngẫu (spouses) hoặc danh sách trống. Không thể suy luận 'mother_code' cho thành viên '{member_code}'.")
+                    else:
+                        logging.warning(f"Không tìm thấy file JSON của cha tại '{father_member_json_path}'. Không thể suy luận 'mother_code' cho thành viên '{member_code}'.")
+                else:
+                    logging.warning(f"Mã cha '{resolved_father_code}' không đúng định dạng 'GPVN-folder-member_index'. Không thể suy luận 'mother_code' cho thành viên '{member_code}'.")
+            except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
+                logging.error(f"Lỗi khi đọc file JSON của cha '{resolved_father_code}' để suy luận 'mother_code' cho thành viên '{member_code}': {e}.")
 
     relationship_data = {
         "member_api_id": member_id_of_primary_member,
-        "member_code": member_data.get("code"), # Use the generated code
-        "gender": member_payload.get("gender"), # Giới tính của thành viên chính
+        "member_code": member_data.get("code"),
+        "gender": member_payload.get("gender"),
         "father_code": resolved_father_code,
         "mother_code": resolved_mother_code,
-        "spouse_codes": [] # Sẽ thu thập mã của tất cả vợ/chồng (chính và phụ)
+        "spouse_codes": []
     }
-    
     pending_relationship_updates.append(relationship_data)
 
     # Xử lý các vợ/chồng phụ (luôn tạo mới hoặc kiểm tra tồn tại, và thu thập để cập nhật mối quan hệ)
