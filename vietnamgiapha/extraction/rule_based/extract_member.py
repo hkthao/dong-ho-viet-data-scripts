@@ -200,19 +200,44 @@ def parse_family_html(html_content, family_id, member_filename):
         value = clean_text(cells[1].get_text()) if len(cells) > 1 else ""
 
         # Handle "Là con của" if it appears in the FAMILY section (before PERSON starts)
-        if current_section == "FAMILY" and "Là con của" in label:
-            name_part = extract_text_after_colon(label) # Use helper for cleaner extraction
+        if current_section == "FAMILY" and "Là con của" in row_text:
+            father_link = row.find('a', href=re.compile(r'/XemChiTietTungNguoi/(\d+)/(\d+)/'))
             
-            if "Thuỷ tổ".lower() in name_part.lower() or "Thủy tổ".lower() in name_part.lower(): # Check for both "Thuỷ tổ" and "Thủy tổ"
-                output["isRoot"] = True
-                output["father"] = None # If it's the progenitor, it doesn't have a father in the tree structure
+            father_name_text = ""
+            father_code = None
+            
+            if father_link:
+                href = father_link.get('href')
+                father_name_text = clean_text(father_link.get_text())
+                match = re.search(r'/XemChiTietTungNguoi/(\d+)/(\d+)/', href)
+                if match:
+                    extracted_family_id = match.group(1)
+                    extracted_member_id = match.group(2)
+                    father_code = f"GPVN-{extracted_family_id}-{extracted_member_id}"
+            
+            # If father_link was not found, or if father_name_text is still empty after trying to get it from the link,
+            # then try to get the name from the general row text (e.g., for cases without a link)
+            if not father_name_text:
+                name_part_from_row_text = extract_text_after_colon(label) # `label` is `clean_text(cells[0].get_text())`
+                father_name_text = name_part_from_row_text
+
+            if not father_name_text: # If after all attempts, no name, skip
+                continue
+
+            # Determine if this father is the "Thuỷ tổ"
+            is_progenitor = "Thuỷ tổ".lower() in father_name_text.lower() or "Thủy tổ".lower() in father_name_text.lower()
+
+            output["isRoot"] = is_progenitor
+
+            # If it's a progenitor AND there's no link associated, then father is truly None (no object)
+            if is_progenitor and father_link is None:
+                 output["father"] = None
             else:
-                output["isRoot"] = False
-                father_info = parse_name_gender(name_part)
+                father_info = parse_name_gender(father_name_text)
                 output["father"] = {
                     "lastName": father_info["lastName"],
                     "firstName": father_info["firstName"],
-                    "code": None,
+                    "code": father_code, # This will be None if no link was found, which is acceptable
                     "gender": "Nam"
                 }
         
@@ -356,52 +381,59 @@ def parse_family_html(html_content, family_id, member_filename):
         # Logic for "Các anh em, dâu rể"
         if "Các anh em, dâu rể:" in row_text:
             data_td = cells[0] # The entire data is in the first cell
-            # Get the content of the td after the "Các anh em, dâu rể:" part
-            text_after_label = ""
-            b_tag = data_td.find("b", string=re.compile(r"Các anh em, dâu rể:"))
-            if b_tag:
-                current_element = b_tag.next_sibling
-                while current_element:
-                    if isinstance(current_element, str):
-                        text_after_label += current_element
-                    elif current_element.name == 'br':
-                        text_after_label += '\n'
-                    else: # Stop if another tag is encountered
-                        break
-                    current_element = current_element.next_sibling
             
-            cleaned_data_text = clean_text(text_after_label)
-
-            if "Không có anh em" in cleaned_data_text:
+            if "Không có anh em" in data_td.get_text(strip=True): # Check if there are no siblings
                 output["siblings"] = [] # Explicitly empty
             else:
-                names = split_by_br_or_newline(cleaned_data_text)
-                for name in names:
-                    sibling = parse_stub_member(name)
+                # Find all <a> tags within the data_td for siblings
+                sibling_links = data_td.find_all('a', href=re.compile(r'/XemChiTietTungNguoi/(\d+)/(\d+)/'))
+                
+                for link in sibling_links:
+                    name_text = clean_text(link.get_text())
+                    href = link.get('href')
+                    
+                    sibling_code = None
+                    match = re.search(r'/XemChiTietTungNguoi/(\d+)/(\d+)/', href)
+                    if match:
+                        extracted_family_id = match.group(1)
+                        extracted_member_id = match.group(2)
+                        sibling_code = f"GPVN-{extracted_family_id}-{extracted_member_id}"
+                    
+                    sibling_info = parse_name_gender(name_text)
+                    sibling = {
+                        "lastName": sibling_info["lastName"],
+                        "firstName": sibling_info["firstName"],
+                        "code": sibling_code,
+                        "gender": sibling_info["gender"] # Can be empty if not in parentheses
+                    }
                     output["siblings"].append(sibling)
             continue # Move to next row
 
         # Logic for "Con cái"
         if "Con cái:" in row_text:
             data_td = cells[0] # The entire data is in the first cell
-            # Get the content of the td after the "Con cái:" part
-            text_after_label = ""
-            b_tag = data_td.find("b", string=re.compile(r"Con cái:"))
-            if b_tag:
-                current_element = b_tag.next_sibling
-                while current_element:
-                    if isinstance(current_element, str):
-                        text_after_label += current_element
-                    elif current_element.name == 'br':
-                        text_after_label += '\n'
-                    else: # Stop if another tag is encountered
-                        break
-                    current_element = current_element.next_sibling
+
+            # Find all <a> tags within the data_td for children
+            child_links = data_td.find_all('a', href=re.compile(r'/XemChiTietTungNguoi/(\d+)/(\d+)/'))
             
-            cleaned_data_text = clean_text(text_after_label)
-            names = split_by_br_or_newline(cleaned_data_text)
-            for name in names:
-                child = parse_stub_member(name)
+            for link in child_links:
+                name_text = clean_text(link.get_text())
+                href = link.get('href')
+                
+                child_code = None
+                match = re.search(r'/XemChiTietTungNguoi/(\d+)/(\d+)/', href)
+                if match:
+                    extracted_family_id = match.group(1)
+                    extracted_member_id = match.group(2)
+                    child_code = f"GPVN-{extracted_family_id}-{extracted_member_id}"
+                
+                child_info = parse_name_gender(name_text)
+                child = {
+                    "lastName": child_info["lastName"],
+                    "firstName": child_info["firstName"],
+                    "code": child_code,
+                    "gender": child_info["gender"] # Can be empty if not in parentheses
+                }
                 output["children"].append(child)
             continue # Move to next row
     

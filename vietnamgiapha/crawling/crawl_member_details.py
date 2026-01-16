@@ -8,24 +8,40 @@ from ..utils.utils import check_file_exists
 
 def _clean_member_html(html_content: str) -> str:
     """
-    Cleans the member detail HTML content by extracting only the content of a specific <td> tag
-    and removing specified tags (p, span, font, img, a) within it.
+    Cleans the member detail HTML content by extracting only the content of a specific <td> tag.
+    It removes specified tags (p, span, font, img) and unwraps <a> tags unless their href
+    starts with '/XemChiTietTungNguoi'. For the retained <a> tags, only the href attribute is kept.
+    All other attributes from all other tags are removed.
     """
     soup = BeautifulSoup(html_content, 'lxml') # Use 'lxml' parser for better performance
 
     target_td = soup.find('td', colspan="2", valign='top', background="https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg", height="100%")
 
     if target_td:
-        # Remove unwanted tags, keeping their text content where applicable
-        for tag_name in ['p', 'span', 'font', 'img', 'a']:
-            for tag in target_td.find_all(tag_name):
-                # If it's an image or link, replace with a placeholder or remove entirely
-                # For now, let's just unwrap them, which keeps the text for <a> and removes <img> entirely
-                tag.unwrap() # Removes the tag but keeps its contents (text)
+        # Step 1: Identify and store hrefs of <a> tags to keep
+        preserved_hrefs = set()
+        for a_tag in target_td.find_all('a'):
+            href = a_tag.get('href')
+            if href and href.startswith('/XemChiTietTungNguoi'):
+                preserved_hrefs.add(href)
+            else:
+                a_tag.unwrap() # Unwraps <a> tags that don't match criteria
 
-        # Remove all attributes from the remaining tags within target_td
-        for tag in target_td.find_all(True): # Find all tags
-            tag.attrs = {} # Clear all attributes
+        # Step 2: Unwrap other unwanted tags
+        for tag_name in ['p', 'span', 'font', 'img']:
+            for tag in target_td.find_all(tag_name):
+                tag.unwrap()
+
+        # Step 3: Clean attributes for all remaining tags
+        for tag in target_td.find_all(True): # Find all remaining tags
+            if tag.name == 'a' and tag.get('href') in preserved_hrefs:
+                # This is an <a> tag that we wanted to keep, restore its href
+                original_href = tag.get('href')
+                tag.attrs = {} # Clear all attributes
+                tag['href'] = original_href # Restore only the href
+            else:
+                # For all other tags (or <a> tags not in preserved_hrefs), clear all attributes
+                tag.attrs = {}
 
         # Return the cleaned content of the target_td wrapped in a basic HTML structure
         return f"<html><body>{str(target_td)}</body></html>"
