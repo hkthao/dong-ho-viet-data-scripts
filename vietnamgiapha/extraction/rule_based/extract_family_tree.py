@@ -95,18 +95,4 @@ def extract_data(html_file_path):
         
     return roots
 
-if __name__ == "__main__":
-    html_file = 'vietnamgiapha/data/samples/sample/pha_he.html'
-    output_dir = 'vietnamgiapha/output' # Changed output to match directory structure from previous tasks
-    output_file = os.path.join(output_dir, 'family_tree.json')
 
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    try:
-        family_tree_data = extract_data(html_file)
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(family_tree_data, f, ensure_ascii=False, indent=2)
-        print(f"Dữ liệu gia phả đã được trích xuất và lưu vào: {output_file}")
-    except Exception as e:
-        print(f"Lỗi khi trích xuất dữ liệu: {e}")
