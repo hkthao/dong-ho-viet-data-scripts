@@ -1,0 +1,212 @@
+# HƯỚNG DẪN TRÍCH XUẤT GIA PHẢ TỪ HTML
+
+**Python + BeautifulSoup → Schema chuẩn**
+
+---
+
+## 1. Mục tiêu
+
+Trích xuất thông tin **Gia phả + Thủy tổ** từ các trang HTML cổ (table-based, font tag, không semantic) và chuẩn hóa thành JSON theo schema:
+
+```json
+{
+  "name": "string",
+  "code": "string",
+  "description": "string",
+  "address": "string",
+  "genealogyRecord": "string",
+  "progenitorName": "string",
+  "familyCovenant": "string",
+  "contactInfo": "string",
+  "avatarBase64": "string",
+  "visibility": "Private",
+  "managerIds": [],
+  "viewerIds": [],
+  "locationId": ""
+}
+```
+
+---
+
+## 2. Phân tích nguồn HTML
+
+### 2.1 HTML 1 – Trang **Tổng quan gia phả**
+
+Nguồn chính để lấy:
+
+* Tên gia phả
+* Chi họ
+* Địa danh
+* Tổng quan (số đời, số người…)
+* Thông tin người quản lý
+
+👉 HTML **không có class/id**, nên phải:
+
+* Dựa vào **text tiếng Việt**
+* Duyệt `<li>`, `<font>`, `<div>`
+
+---
+
+### 2.2 HTML 2 – Trang **Thủy tổ**
+
+Nguồn chính để lấy:
+
+* Tên thủy tổ
+* Tiểu sử chi tiết (rất dài)
+* Có thể dùng làm **genealogyRecord** hoặc **description**
+
+👉 Nội dung nằm trong:
+
+```html
+<td><div align="justify"> ... </div></td>
+```
+
+---
+
+## 3. Chiến lược trích xuất (QUAN TRỌNG)
+
+### Nguyên tắc
+
+1. **Không phụ thuộc cấu trúc table**
+2. Ưu tiên:
+
+   * `get_text(strip=True)`
+   * Tìm theo **keyword tiếng Việt**
+3. Luôn normalize text:
+
+   * Remove `\xa0`
+   * Gộp khoảng trắng
+4. HTML cổ → **đừng dùng CSS selector phức tạp**
+
+---
+
+## 4. Mapping dữ liệu → Schema
+
+| Schema field      | Nguồn   | Cách trích                               |
+| ----------------- | ------- | ---------------------------------------- |
+| `name`            | HTML 1  | "GIA PHẢ TỘC Chi họ …"                   |
+| `code`            | HTML 1  | Slug hóa tên                             |
+| `description`     | HTML 1  | Lời nói tiêu biểu                        |
+| `address`         | HTML 1  | Đoạn “Ở tại …”                           |
+| `genealogyRecord` | HTML 2  | Toàn bộ nội dung Thủy tổ                 |
+| `progenitorName`  | HTML 2  | “CỤ TỔ …”                                |
+| `familyCovenant`  | HTML 2  | Nếu có trang Tộc Ước (chưa có → để rỗng) |
+| `contactInfo`     | HTML 1  | Người làm, địa chỉ, điện thoại, email    |
+| `avatarBase64`    | —       | null / ""                                |
+| `visibility`      | default | `"Private"`                              |
+
+---
+
+## 5. Code Python – Trích xuất HTML 1 (Tổng quan)
+
+```python
+from bs4 import BeautifulSoup
+import re
+
+def clean_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+
+def extract_overview(html: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text("\n")
+
+    result = {}
+
+    # NAME
+    for line in text.splitlines():
+        if "GIA PHẢ" in line and "Chi họ" in line:
+            result["name"] = clean_text(line)
+            break
+
+    # DESCRIPTION (lời nói tiêu biểu)
+    m = re.search(r"Lời nói tiêu biểu của học tộc\s+(.*)", text)
+    if m:
+        result["description"] = clean_text(m.group(1))
+
+    # ADDRESS
+    m = re.search(r"Thôn.*?tỉnh.*", text)
+    if m:
+        result["address"] = clean_text(m.group(0))
+
+    # CONTACT INFO
+    contact_lines = []
+    for li in soup.find_all("li"):
+        if any(k in li.get_text() for k in ["Người làm", "Địa chỉ", "Điện thoại", "Email"]):
+            contact_lines.append(clean_text(li.get_text()))
+
+    result["contactInfo"] = " | ".join(contact_lines)
+
+    return result
+```
+
+---
+
+## 6. Code Python – Trích xuất HTML 2 (Thủy tổ)
+
+```python
+def extract_progenitor(html: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+
+    content_div = soup.find("div", align="justify")
+    if not content_div:
+        return {}
+
+    full_text = clean_text(content_div.get_text("\n"))
+
+    result = {}
+    result["genealogyRecord"] = full_text
+
+    # PROGENITOR NAME
+    m = re.search(r"CỤ TỔ\s+([A-ZĐ\s]+)", full_text)
+    if m:
+        result["progenitorName"] = clean_text(m.group(1))
+
+    return result
+```
+
+---
+
+## 7. Ghép dữ liệu → Schema hoàn chỉnh
+
+```python
+def build_schema(overview: dict, progenitor: dict) -> dict:
+    return {
+        "name": overview.get("name", ""),
+        "code": re.sub(r"\s+", "-", overview.get("name", "").lower()),
+        "description": overview.get("description", ""),
+        "address": overview.get("address", ""),
+        "genealogyRecord": progenitor.get("genealogyRecord", ""),
+        "progenitorName": progenitor.get("progenitorName", ""),
+        "familyCovenant": "",
+        "contactInfo": overview.get("contactInfo", ""),
+        "avatarBase64": "",
+        "visibility": "Private",
+        "managerIds": [],
+        "viewerIds": [],
+        "locationId": ""
+    }
+```
+
+---
+
+## 8. Output JSON mẫu
+
+```json
+{
+  "name": "GIA PHẢ TỘC Chi họ Cao Minh Triết - Hưng Yên",
+  "code": "gia-pha-toc-chi-ho-cao-minh-triet-hung-yen",
+  "description": "Đói cho sạch, rách cho thơm",
+  "address": "Thôn Tam Kỳ - Làng Xuân Cầu - xã Nghĩa Trụ - tỉnh Hưng Yên",
+  "genealogyRecord": "CỤ TỔ CAO MINH TRIẾT sinh năm 1836 ...",
+  "progenitorName": "CAO MINH TRIẾT",
+  "familyCovenant": "",
+  "contactInfo": "Người làm: Ông Cao Tuấn Long | Địa chỉ: 402D6DichVong | Điện thoại: 0983842070 | Email: Caotuanlong@gmail.com",
+  "avatarBase64": "",
+  "visibility": "Private",
+  "managerIds": [],
+  "viewerIds": [],
+  "locationId": ""
+}
+```
+
+---

@@ -9,11 +9,7 @@
   "contactInfo": "string",
   "avatarBase64": "string",
   "visibility": "Private",
-  "managerIds": [
-    "00000000-0000-0000-0000-000000000000"
-  ],
-  "viewerIds": [
-    "00000000-0000-0000-0000-000000000000"
-  ],
-  "locationId": "00000000-0000-0000-0000-000000000000"
+  "managerIds": [],
+  "viewerIds": [],
+  "locationId": ""
 }
