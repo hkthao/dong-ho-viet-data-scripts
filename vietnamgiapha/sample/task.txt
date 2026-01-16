@@ -317,3 +317,138 @@ return json.dumps(output, ensure_ascii=False, indent=2)
 ☑ Không hardcode index HTML
 
 ---
+
+
+BỔ SUNG PHẦN TRÍCH XUẤT
+Các anh em, dâu rể & Con cái
+1. Nguyên tắc chung (Gemini CLI phải tuân theo)
+
+Dữ liệu anh em / con cái thường nằm trong cùng 1 <td>
+
+Dùng:
+
+<br> để tách tên
+
+Text đứng sau dấu : là dữ liệu
+
+KHÔNG tạo member đầy đủ ngay
+
+Chỉ tạo stub object (đủ để liên kết graph)
+
+Không nhầm anh em với con cái
+
+2. Cập nhật schema mở rộng (khuyến nghị)
+
+👉 KHÔNG sửa schema gốc, chỉ append field mới
+
+# mở rộng output
+output["siblings"] = []   # anh chị em ruột
+output["children"] = []   # con ruột
+
+Stub object chuẩn
+{
+  "lastName": "",
+  "firstName": "",
+  "gender": "",
+  "code": None
+}
+
+3. Nhận diện block “Các anh em, dâu rể”
+HTML ví dụ
+<tr>
+  <td><b>Các anh em, dâu rể: </b> Không có anh em</td>
+</tr>
+
+
+Hoặc:
+
+<tr>
+  <td><b>Các anh em, dâu rể: </b><br />
+      Cao Văn A<br />
+      Cao Văn B
+  </td>
+</tr>
+
+Thuật toán
+if "Các anh em" in row_text:
+    data = extract_text_after_colon(row_text)
+
+    if "Không có" in data:
+        output["siblings"] = []
+    else:
+        names = split_by_br_or_newline(row)
+        for name in names:
+            sibling = parse_stub_member(name)
+            output["siblings"].append(sibling)
+
+parse_stub_member(name)
+def parse_stub_member(name):
+    gender = extract_gender_if_exists(name)
+    clean_name = remove_gender(name)
+    parts = clean_name.split()
+
+    return {
+        "lastName": parts[0],
+        "firstName": " ".join(parts[1:]),
+        "gender": gender,
+        "code": None
+    }
+
+
+📌 Lưu ý
+
+“dâu rể” → có thể không cùng họ
+
+Nếu phát hiện từ khóa:
+
+"vợ", "chồng", "dâu", "rể"
+→ đánh dấu relationship sau, không gán làm sibling ruột
+
+4. Trích xuất “Con cái”
+HTML ví dụ
+<tr>
+  <td>
+    <b>Con cái: </b><br />
+       Cao Tế<br />
+       Cao Thị Nhình
+  </td>
+</tr>
+
+Thuật toán
+if "Con cái" in row_text:
+    raw_block = get_td_inner_text(row)
+    children_names = extract_lines_after_colon(raw_block)
+
+    for name in children_names:
+        child = parse_stub_member(name)
+        output["children"].append(child)
+
+5. Mapping sang schema gốc (rất quan trọng)
+❓ Vì schema hiện tại KHÔNG có children
+
+👉 Không gán children vào output chính
+👉 Dùng children để:
+
+Tạo member mới ở bước sau
+
+Gán:
+
+child.father = current_member
+
+
+Hoặc build family graph
+
+6. Tránh lỗi thường gặp
+
+❌ Gộp “anh em” + “con cái”
+❌ Lấy cả text <b> vào tên
+❌ Không strip &nbsp;
+❌ Nhầm dâu/rể là anh em ruột
+
+7. Checklist cho Gemini CLI
+
+☑ Phát hiện đúng block
+☑ Tách tên bằng <br>
+☑ Không tạo member rỗng
+☑ Children ≠ siblings
+☑ Không phá schema gốc

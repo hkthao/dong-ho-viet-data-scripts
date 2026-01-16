@@ -98,6 +98,31 @@ def generate_member_code(lastName, gender, generation, order):
     # For now, it will return a simple concatenation.
     return f"GPVN-M-{generation}-{lastName[:2].upper()}-{order}"
 
+def extract_text_after_colon(text):
+    """Trích xuất văn bản sau dấu hai chấm đầu tiên."""
+    parts = text.split(':', 1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+def split_by_br_or_newline(html_content):
+    """Tách văn bản HTML bởi thẻ <br> hoặc xuống dòng."""
+    soup = BeautifulSoup(str(html_content), "lxml")
+    # Replace <br> tags with newlines for consistent splitting
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    # Get text and split by newlines, filter out empty lines
+    return [line.strip() for line in soup.get_text().split('\n') if line.strip()]
+
+def parse_stub_member(name_text):
+    """Tạo đối tượng thành viên stub từ tên."""
+    # Reuse parse_name_gender for gender and name splitting
+    name_gender_info = parse_name_gender(name_text)
+    return {
+        "lastName": name_gender_info["lastName"],
+        "firstName": name_gender_info["firstName"],
+        "gender": name_gender_info["gender"],
+        "code": None
+    }
+
 def parse_family_html(html_content):
     """Phân tích HTML gia phả và trả về JSON theo schema."""
     soup = BeautifulSoup(html_content, "lxml")
@@ -127,7 +152,9 @@ def parse_family_html(html_content):
         "generation": 0,
         "father": None,
         "mother": None,
-        "spouses": [] # Explicitly initialize as an empty list for each call
+        "spouses": [], # Explicitly initialize as an empty list for each call
+        "siblings": [], # Re-introducing siblings list as per extended schema
+        "children": [] # Re-introducing children list as per extended schema
     }
 
     current_section = None
@@ -153,10 +180,6 @@ def parse_family_html(html_content):
             current_section = "SPOUSE_SECTION"
             # Prepare for a new spouse. The actual spouse object is created when 'Tên' is found.
             current_spouse = None
-            continue
-        elif "Con cái" in row_text:
-            current_section = "CHILDREN"
-            current_spouse = None # Reset spouse context
             continue
 
         cells = row.find_all(["td", "th"]) # Include th as some labels might be in th
@@ -257,6 +280,8 @@ def parse_family_html(html_content):
                         if next_row_cells:
                             set_output_field(current_spouse, "biography", next_row_cells[0].get_text())
         
+
+        
     # After the loop, if there's a current_spouse that hasn't been added, add it.
     if current_spouse is not None and (current_spouse["lastName"] or current_spouse["firstName"]):
         output["spouses"].append(current_spouse)
@@ -274,6 +299,71 @@ def parse_family_html(html_content):
             order=output["order"]
         )
 
+    # Ensure mother is null
+    output["mother"] = None
+
+    # Implement parsing for "Các anh em, dâu rể" and "Con cái"
+    # These sections are not state-based like PERSON or SPOUSE_SECTION;
+    # their data is typically self-contained within a single <td> element.
+    for i, row in enumerate(rows):
+        row_text = row.get_text(strip=True)
+        cells = row.find_all(["td", "th"])
+
+        if not cells:
+            continue
+
+        # Logic for "Các anh em, dâu rể"
+        if "Các anh em, dâu rể:" in row_text:
+            data_td = cells[0] # The entire data is in the first cell
+            # Get the content of the td after the "Các anh em, dâu rể:" part
+            text_after_label = ""
+            b_tag = data_td.find("b", string=re.compile(r"Các anh em, dâu rể:"))
+            if b_tag:
+                current_element = b_tag.next_sibling
+                while current_element:
+                    if isinstance(current_element, str):
+                        text_after_label += current_element
+                    elif current_element.name == 'br':
+                        text_after_label += '\n'
+                    else: # Stop if another tag is encountered
+                        break
+                    current_element = current_element.next_sibling
+            
+            cleaned_data_text = clean_text(text_after_label)
+
+            if "Không có anh em" in cleaned_data_text:
+                output["siblings"] = [] # Explicitly empty
+            else:
+                names = split_by_br_or_newline(cleaned_data_text)
+                for name in names:
+                    sibling = parse_stub_member(name)
+                    output["siblings"].append(sibling)
+            continue # Move to next row
+
+        # Logic for "Con cái"
+        if "Con cái:" in row_text:
+            data_td = cells[0] # The entire data is in the first cell
+            # Get the content of the td after the "Con cái:" part
+            text_after_label = ""
+            b_tag = data_td.find("b", string=re.compile(r"Con cái:"))
+            if b_tag:
+                current_element = b_tag.next_sibling
+                while current_element:
+                    if isinstance(current_element, str):
+                        text_after_label += current_element
+                    elif current_element.name == 'br':
+                        text_after_label += '\n'
+                    else: # Stop if another tag is encountered
+                        break
+                    current_element = current_element.next_sibling
+            
+            cleaned_data_text = clean_text(text_after_label)
+            names = split_by_br_or_newline(cleaned_data_text)
+            for name in names:
+                child = parse_stub_member(name)
+                output["children"].append(child)
+            continue # Move to next row
+    
     # Ensure all string fields are "" if None or not set
     for key, val in output.items():
         if isinstance(val, str) and not val:
@@ -289,6 +379,22 @@ def parse_family_html(html_content):
             elif val is None and key in ["lastName", "firstName", "gender", "biography"]:
                 spouse[key] = ""
     
+    # Ensure sibling stub objects are standardized
+    for sibling in output["siblings"]:
+        for key, val in sibling.items():
+            if isinstance(val, str) and not val:
+                sibling[key] = ""
+            elif val is None and key in ["lastName", "firstName", "gender", "code"]:
+                sibling[key] = ""
+
+    # Ensure children stub objects are standardized
+    for child in output["children"]:
+        for key, val in child.items():
+            if isinstance(val, str) and not val:
+                child[key] = ""
+            elif val is None and key in ["lastName", "firstName", "gender", "code"]:
+                child[key] = ""
+    
     # Final check for isDeceased - if dateOfDeath is set, then isDeceased must be True
     if output["dateOfDeath"]:
         output["isDeceased"] = True
@@ -300,8 +406,8 @@ def parse_family_html(html_content):
 
 if __name__ == "__main__":
     import os
-    sample_dir = "./dong-ho-viet-data-scripts/vietnamgiapha/sample"
-    output_dir = "./dong-ho-viet-data-scripts/output_json"
+    sample_dir = "vietnamgiapha/sample"
+    output_dir = "output_json"
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -320,6 +426,7 @@ if __name__ == "__main__":
             # Construct output JSON filename
             base_filename = os.path.splitext(filename)[0]
             output_json_path = os.path.join(output_dir, f"{base_filename}.json")
+            print(f"Attempting to write to: {os.path.abspath(output_json_path)}")
             
             with open(output_json_path, "w", encoding="utf-8") as json_f:
                 json_f.write(json_output)
