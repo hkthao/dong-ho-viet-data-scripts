@@ -1,475 +1,476 @@
-import requests
-import json
+# -*- coding: utf-8 -*-
 import os
-import argparse
-import glob
-import time
-import sys
-import traceback # Keep sys for file=sys.stderr
+import json
+import requests
+import logging
+from typing import Optional
 
-BASE_URL = "http://localhost:8080/api" # Assuming the API is running locally
-ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVlOUx4b24yV0xaMUNvN2g3aFMyTCJ9.eyJodHRwczovL2ZhbWlseXRyZWUuY29tL3JvbGVzIjpbIkFkbWluIl0sImh0dHBzOi8vZmFtaWx5dHJlZS5jb20vZW1haWwiOiJ0aGFvLmhrOTBAZ21haWwuY29tIiwiaHR0cHM6Ly9mYW1pbHl0cmVlLmNvbS9uYW1lIjoidGhhby5oazkwQGdtYWlsLmNvbSIsImlzcyI6Imh0dHBzOi8vZGV2LWc3NnRxMDBnaWN3ZHprM3oudXMuYXV0aDAuY29tLyIsInN1YiI6ImF1dGgwfDY4ZTM4YTVhOTY5MTA3ZWJhYTkxMjU3NyIsImF1ZCI6WyJodHRwOi8vbG9jYWxob3N0OjUwMDAiLCJodHRwczovL2Rldi1nNzZ0cTAwZ2ljd2R6azN6LnVzLmF1dGgwLmNvbS91c2VyaW5mbyJdLCJpYXQiOjE3Njg0MTAwOTQsImV4cCI6MTc2ODQ5NjQ5NCwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsImF6cCI6InY0alNlNVFSNFVqNmRkb0JCTUhOdGFETkh3djhVelFOIn0.YrKqrCSa1J7N02eQfQvVd_TEMLCe0MUp8vEdJx85yEgau1V_4BPfGPAaMmn5T5VgXvtuB1GiKYUo_VcOhaw0VModI8ewRtBvLLyc7dGFfXpwbXYS3AyuWOmhZQg6TqZxIssxVXOMi7qYuIkOp9xceXabUMr4D3TLGMKO0U7AlRXUgtCkGqw1ERiM4mAQri40RKF0zpN0mJb3bFQkk-igS0lBMZo7l8kWd7sguAlpeMrC95yUmOfvCOCbpBULhn0-Yb1z0nEaCgcUJ02qIdCLgbez42tmNmQXeva2MVUmCREdt2r_TqlbclWJRzVZiEwHy6e6_5Hn1X6iDEpKyXB-TA"
+# Cấu hình logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_member(member_id):
-    url = f"{BASE_URL}/member/{member_id}"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
+# Cấu hình API
+BASE_URL = "http://localhost:8080/api" # Thay đổi nếu API của bạn chạy ở địa chỉ khác
+AUTH_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImVlOUx4b24yV0xaMUNvN2g3aFMyTCJ9.eyJodHRwczovL2ZhbWlseXRyZWUuY29tL3JvbGVzIjpbIkFkbWluIl0sImh0dHBzOi8vZmFtaWx5dHJlZS5jb20vZW1haWwiOiJ0aGFvLmhrOTBAZ21haWwuY29tIiwiaHR0cHM6Ly9mYW1pbHl0cmVlLmNvbS9uYW1lIjoidGhhby5oazkwQGdtYWlsLmNvbSIsImlzcyI6Imh0dHBzOi8vZGV2LWc3NnRxMDBnaWN3ZHprM3oudXMuYXV0aDAuY29tLyIsInN1YiI6ImF1dGgwfDY4ZTM4YTVhOTY5MTA3ZWJhYTkxMjU3NyIsImF1ZCI6WyJodHRwOi8vbG9jYWxob3N0OjUwMDAiLCJodHRwczovL2Rldi1nNzZ0cTAwZ2ljd2R6azN6LnVzLmF1dGgwLmNvbS91c2VyaW5mbyJdLCJpYXQiOjE3Njg1NTk1NzksImV4cCI6MTc2ODY0NTk3OSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsImF6cCI6InY0alNlNVFSNFVqNmRkb0JCTUhOdGFETkh3djhVelFOIn0.H6z5J4ymNMOzxKii044fvSbT-llLQH6APT-2z0P1vw5jnXzgov9uYCbxZvv4qt76175LjKlamhXWH2FjGSAcey8YUnYGsvWZjlJw8YG3dHkUNnUtaJFXdjgPwA06FatBj4sze4JgfZdNLMsBpvcY2nlHJ6DrV888Xci7c3Ly3XmmTg9KPRU9TuBbSXFHtr2qJTrBmIiEZvaDbJQl5UGudYdNhPc8qPrOK-X2hZWQ1h2e9saMIF1sZH-oOLKerTAny7j89djtXoUgjThKa8OGSCULgHO4YmWZCWCJ6_E2vOUR9KgZvv2EAxar4pKMZHyRBvraPuNtv1mR-5ebvJ1ifg" # Thay thế bằng token xác thực thực tế của bạn
+
+HEADERS = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {AUTH_TOKEN}"
+}
+
+OUTPUT_DIR = "output"
+
+member_id_map = {} # Global map to store member_code -> member_id for pha_he.json processing and relationship resolution
+
+def get_family_by_code(family_code: str) -> Optional[str]:
+    """
+    Kiểm tra xem gia đình có tồn tại không và trả về Family ID nếu có.
+    """
     try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Lỗi khi lấy thông tin thành viên {member_id}: {e}", file=sys.stderr)
-        return None
-
-def update_member(member_id, member_data):
-    url = f"{BASE_URL}/member/{member_id}"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
-    try:
-        response = requests.put(url, headers=headers, json=member_data)
-        response.raise_for_status()
-        return True
-    except requests.exceptions.RequestException as e:
-        print(f"Lỗi khi cập nhật thành viên {member_id}: {e}", file=sys.stderr)
-        print(f"Phản hồi lỗi: {response.text}", file=sys.stderr)
-        return False
-
-def create_family(family_data):
-    url = f"{BASE_URL}/family"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
-    try:
-        response = requests.post(url, headers=headers, json=family_data)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        return response.json()["value"]
-    except requests.exceptions.RequestException as e:
-        print(f"Lỗi khi tạo gia đình: {e}", file=sys.stderr)
-        if hasattr(response, 'text'):
-            print(f"Phản hồi lỗi: {response.text}", file=sys.stderr)
-        return None
-
-def create_member(member_data):
-    url = f"{BASE_URL}/member"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
-    # Wrap member_data in a 'command' object
-    payload = member_data
-    print(f"DEBUG: Sending payload to /api/member: {json.dumps(payload, ensure_ascii=False, indent=2)}", file=sys.stderr)
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        print(f"DEBUG: API /member response status: {response.status_code}", file=sys.stderr)
-        print(f"DEBUG: API /member raw response: {response.text}", file=sys.stderr)
-        try:
-            response_json = response.json()
-            if isinstance(response_json, dict) and "value" in response_json:
-                return response_json["value"]
-            elif isinstance(response_json, str): # If API returns GUID as a string directly
-                return response_json
-            else: # Fallback for unexpected JSON structure
-                print(f"Cảnh báo: Phản hồi API /member không chứa khóa 'value' hoặc có định dạng không mong đợi: {response.text}", file=sys.stderr)
+        response = requests.get(f"{BASE_URL}/family/by-code/{family_code}", headers=HEADERS)
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                if result.get("id"):
+                    logging.info(f"Gia đình với mã '{family_code}' đã tồn tại, ID: {result['id']}")
+                    return result["id"]
+            except json.JSONDecodeError:
+                logging.error(f"Phản hồi API không phải JSON hợp lệ khi kiểm tra gia đình '{family_code}': {response.text}")
                 return None
-        except json.JSONDecodeError:
-            print(f"Lỗi: Không thể phân tích cú pháp JSON từ phản hồi API /member: {response.text}", file=sys.stderr)
+        elif response.status_code == 404 or (response.status_code == 400 and "Family with code" in response.text and "not found" in response.text):
+            logging.info(f"Gia đình với mã '{family_code}' chưa tồn tại.")
             return None
-    except requests.exceptions.RequestException as e:
-        print(f"Lỗi khi tạo thành viên: {e}", file=sys.stderr)
-        if hasattr(response, 'text'):
-            print(f"Phản hồi lỗi: {response.text}", file=sys.stderr)
-        return None
-
-def get_family_by_code(family_code):
-    url = f"{BASE_URL}/family/by-code/{family_code}"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Accept": "application/json"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json() # Direct return of FamilyDto object
-
-    except requests.exceptions.RequestException as e:
-        if hasattr(response, 'status_code'):
-            if response.status_code == 404:
-                return None # Family not found
-            else:
-                try:
-                    error_response = response.json()
-                    if not error_response.get("succeeded", True): # Check if API explicitly says not succeeded
-                        print(f"Lỗi API khi lấy thông tin gia đình bằng code {family_code}: {error_response.get('errors')}", file=sys.stderr)
-                        return None
-                except json.JSONDecodeError:
-                    pass # Not a JSON error, proceed with generic error message
-        print(f"Lỗi khi lấy thông tin gia đình bằng code {family_code}: {e}", file=sys.stderr)
-        if hasattr(response, 'text'):
-            print(f"Phản hồi lỗi: {response.text}", file=sys.stderr)
-        return None
-
-def get_member_by_family_id_and_code(family_id, member_code):
-    url = f"{BASE_URL}/member/by-family/{family_id}/by-code/{member_code}"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
-        "Accept": "application/json"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json() # Returns the full MemberDto object
-    except requests.exceptions.RequestException as e:
-        if hasattr(response, 'status_code'):
-            if response.status_code == 404: # This is the expected "not found" status
-                return None
-            elif response.status_code == 400: # Handle 400 Bad Request
-                try:
-                    error_response = response.json()
-                    if "detail" in error_response and "not found" in error_response["detail"].lower():
-                        return None # Treat as "not found" if the message indicates it
-                except json.JSONDecodeError:
-                    pass # Not a JSON error, proceed with generic error message
-        print(f"Lỗi khi lấy thông tin thành viên bằng family ID '{family_id}' và code '{member_code}': {e}", file=sys.stderr)
-        if hasattr(response, 'text'):
-            print(f"Phản hồi lỗi: {response.text}", file=sys.stderr)
-        return None
-
-def parse_name(full_name):
-    full_name = str(full_name).strip() # Ensure it's a string and trim whitespace
-    parts = full_name.split()
-    
-    last_name = ""
-    first_name = ""
-
-    if len(parts) > 1:
-        first_name = parts[-1]
-        last_name = " ".join(parts[:-1])
-    elif len(parts) == 1:
-        # If only one word, treat it as first name, and use a placeholder for last name
-        # Or, treat it as last name and use a placeholder for first name
-        # Given Vietnamese names, often the last part is the given name.
-        first_name = parts[0]
-        last_name = "Unknown" # Or handle as per specific convention
-    else: # Empty string
-        first_name = "Unknown"
-        last_name = "Unknown"
-            
-    # Ensure both are non-empty
-    if not last_name:
-        last_name = "Chưa xác định" # Hoặc xử lý theo quy ước cụ thể
-    if not first_name:
-        first_name = "Chưa xác định"
-            
-    return last_name, first_name
-
-import re
-
-def format_date_for_api(date_string):
-    if date_string is None or date_string == "null" or date_string == "":
-        return None
-    
-    # Check for YYYY-MM-DD format
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_string):
-        return f"{date_string}T00:00:00Z"
-    
-    # Check for YYYY-01-01 format (meaning only year is known)
-    if re.match(r"^\d{4}-01-01$", date_string):
-        return f"{date_string}T00:00:00Z" # This is already YYYY-MM-DDT00:00:00Z
-
-    # If only year is provided (e.g., "1960"), format as YYYY-01-01
-    if re.match(r"^\d{4}$", date_string):
-        return f"{date_string}-01-01T00:00:00Z"
-
-    # Fallback for unexpected formats, return None to avoid API errors
-    return None
-
-def main():
-    parser = argparse.ArgumentParser(description="Tạo gia đình và thành viên từ dữ liệu JSON.")
-    parser.add_argument("--folder_name", required=True, help="Tên thư mục chứa dữ liệu JSON (ví dụ: 1691). Đường dẫn đầy đủ sẽ là output/{folder_name}/data.")
-    parser.add_argument("--family_id", help="ID gia đình hiện có (nếu không cung cấp, một gia đình mới sẽ được tạo).")
-    parser.add_argument("--limit", type=int, default=0, help="Giới hạn số lượng thành viên sẽ được xử lý (0 = không giới hạn).")
-    
-    args = parser.parse_args()
-
-    folder_name = args.folder_name
-    data_dir = os.path.join("output", folder_name, "data")
-    
-    local_family_identifier = args.family_id if args.family_id else folder_name # Use folder_name if family_id is not provided
-    api_family_guid = None # This will be the actual GUID from the API
-
-    # Construct the family code
-    family_code_to_check = f"VNGP-{local_family_identifier}" if local_family_identifier else "VNGP-TEMP"
-
-    # 1. Kiểm tra gia đình đã tồn tại chưa
-    print(f"Đang kiểm tra xem gia đình với mã '{family_code_to_check}' đã tồn tại trên API chưa...")
-    existing_family = get_family_by_code(family_code_to_check)
-
-    if existing_family:
-        api_family_guid = existing_family["id"]
-        print(f"Gia đình với mã '{family_code_to_check}' đã tồn tại với API GUID: {api_family_guid}. Đang sử dụng gia đình hiện có.")
-    else:
-        # 1. Đọc thông tin gia đình
-        giapha_info_path = os.path.join(data_dir, f"giapha_info_{folder_name}.json")
-        try:
-            with open(giapha_info_path, "r", encoding="utf-8") as f:
-                family_info = json.load(f)
-        except FileNotFoundError:
-            print(f"Lỗi: Không tìm thấy tệp {giapha_info_path}", file=sys.stderr)
-            return
-        except json.JSONDecodeError:
-            print(f"Lỗi: Không thể phân tích cú pháp tệp JSON {giapha_info_path}", file=sys.stderr)
-            return
-
-        # 2. Tạo gia đình
-        print("Đang tạo gia đình mới trên API...")
-        family_payload = {
-            "name": family_info.get("name", "Gia đình không tên"),
-            "code": family_code_to_check, # Sử dụng mã gia đình đã kiểm tra
-            "address": family_info.get("address"),
-            "description": family_info.get("description"),
-            "visibility": "Private" # Mặc định là Private
-        }
-        api_family_guid = create_family(family_payload)
-        if api_family_guid:
-            print(f"Đã tạo gia đình mới với API GUID: {api_family_guid}")
         else:
-            print("Không thể tạo gia đình mới. Đang thoát.")
-            return
+            logging.error(f"Lỗi khi kiểm tra gia đình '{family_code}': {response.status_code} - {response.text}")
+            return None
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"Lỗi HTTP khi kiểm tra gia đình '{family_code}': {http_err}. Phản hồi: {response.text}")
+        return None
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Lỗi kết nối khi gọi API kiểm tra gia đình '{family_code}': {req_err}")
+        return None
 
-    # The family_id passed to member_payload is always the API GUID
-    family_id_for_payload = api_family_guid
+def get_member_by_code(family_id: str, member_code: str) -> Optional[str]:
+    """
+    Kiểm tra xem thành viên có tồn tại không và trả về Member ID nếu có.
+    """
+    try:
+        response = requests.get(f"{BASE_URL}/member/by-family/{family_id}/by-code/{member_code}", headers=HEADERS)
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                if result.get("id"):
+                    logging.info(f"Thành viên với mã '{member_code}' trong gia đình '{family_id}' đã tồn tại, ID: {result['id']}")
+                    return result["id"]
+            except json.JSONDecodeError:
+                logging.error(f"Phản hồi API không phải JSON hợp lệ khi kiểm tra thành viên '{member_code}' trong gia đình '{family_id}': {response.text}")
+                return None
+        elif response.status_code == 404:
+            logging.info(f"Thành viên với mã '{member_code}' trong gia đình '{family_id}' chưa tồn tại.")
+            return None
+        else:
+            logging.error(f"Lỗi khi kiểm tra thành viên '{member_code}' trong gia đình '{family_id}': {response.status_code} - {response.text}")
+            return None
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"Lỗi HTTP khi kiểm tra thành viên '{member_code}' trong gia đình '{family_id}': {http_err}. Phản hồi: {response.text}")
+        return None
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Lỗi kết nối khi gọi API kiểm tra thành viên '{member_code}' trong gia đình '{family_id}': {req_err}")
+        return None
 
-    # The identifier used in codes (familyCode, memberCode)
-    identifier_for_codes = local_family_identifier if local_family_identifier else api_family_guid
+def create_family(folder_name: str, family_data: dict) -> Optional[str]:
+    """
+    Tạo một gia đình mới thông qua API.
+    Trả về Family ID nếu thành công, ngược lại trả về None.
+    """
+    family_code = f"VNGP-{folder_name}"
+    logging.info(f"Đang xử lý gia đình với mã: {family_code}")
 
-    # 3. Tạo thành viên (Pass 1: Create members)
-    members_dir = os.path.join(data_dir, "members")
-    member_files = glob.glob(os.path.join(members_dir, "*.json"))
-    
-    if args.limit > 0:
-        member_files = member_files[:args.limit]
-    
-    member_id_map = {} # Map original_file_id to created_member_guid
-    all_member_data_raw = {} # Store raw JSON data for second pass
+    # Bước 1: Kiểm tra xem gia đình đã tồn tại chưa
+    existing_family_id = get_family_by_code(family_code)
+    if existing_family_id:
+        return existing_family_id
 
-    print(f"\n--- Bắt đầu tạo thành viên (Lượt 1) ---")
-    print(f"Tìm thấy {len(member_files)} tệp thành viên.")
+    # Bước 2: Nếu chưa tồn tại, tiến hành tạo mới
+    family_payload = {
+        "name": family_data.get("name", f"Gia đình {folder_name}"),
+        "code": family_code,
+        "description": family_data.get("description"),
+        "address": family_data.get("address"),
+        "genealogyRecord": family_data.get("genealogyRecord"),
+        "progenitorName": family_data.get("progenitorName"),
+        "familyCovenant": family_data.get("familyCovenant"),
+        "contactInfo": family_data.get("contactInfo"),
+        "avatarBase64": family_data.get("avatarBase64"),
+        "visibility": family_data.get("visibility", "Private"),
+        "managerIds": family_data.get("managerIds", []),
+        "viewerIds": family_data.get("viewerIds", []),
+        "locationId": family_data.get("locationId") if family_data.get("locationId") else None
+    }
 
-    for member_file in member_files:
+    try:
+        response = requests.post(f"{BASE_URL}/family", headers=HEADERS, json=family_payload)
+        response.raise_for_status() # Ném lỗi cho các mã trạng thái HTTP xấu (4xx hoặc 5xx)
+        
         try:
-            with open(member_file, "r", encoding="utf-8") as f:
-                member_data_raw = json.load(f)
+            result = response.json()
+            if isinstance(result, dict) and result.get("succeeded"):
+                family_id = result.get("value")
+                logging.info(f"Tạo gia đình '{family_payload['name']}' ({family_code}) thành công với ID: {family_id}")
+                return family_id
+            else:
+                error_details = result.get('errors')
+                if isinstance(error_details, str) and len(error_details) == 36 and all(c in "0123456789abcdef-" for c in error_details): # Simple GUID check
+                    logging.error(f"Tạo gia đình '{family_payload['name']}' ({family_code}) thất bại. Mã lỗi API: {error_details}. Vui lòng kiểm tra log backend API để biết thêm chi tiết.")
+                else:
+                    logging.error(f"Tạo gia đình '{family_payload['name']}' ({family_code}) thất bại: {error_details if isinstance(error_details, dict) or isinstance(error_details, list) else response.text}")
+                return None
+        except json.JSONDecodeError:
+            logging.error(f"Phản hồi API không phải JSON hợp lệ khi tạo gia đình '{family_payload['name']}' ({family_code}): {response.text}")
+            return None
             
-            main_person = member_data_raw.get("main_person", {})
-            original_file_id = os.path.splitext(os.path.basename(member_file))[0]
-            all_member_data_raw[original_file_id] = member_data_raw
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"Lỗi HTTP khi gọi API tạo gia đình '{family_payload['name']}' ({family_code}): {http_err}. Phản hồi: {response.text}")
+        return None
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Lỗi kết nối khi gọi API tạo gia đình '{family_payload['name']}' ({family_code}): {req_err}")
+        return None
 
-            if not main_person:
-                print(f"Cảnh báo: Không tìm thấy 'main_person' trong tệp {member_file}. Bỏ qua.", file=sys.stderr)
+def create_member(family_id: str, folder_name: str, file_name: str, member_data: dict,
+                  pending_relationship_updates: list) -> Optional[str]:
+    """
+    Tạo một thành viên mới thông qua API (Pass 1).
+    Trả về Member ID nếu thành công, ngược lại trả về None.
+    Thu thập thông tin mối quan hệ để cập nhật ở lượt 2.
+    """
+    member_code = f"VNGP-{folder_name}-{os.path.splitext(file_name)[0]}"
+    logging.info(f"Đang xử lý thành viên với mã: {member_code} cho gia đình ID: {family_id} (Lượt 1 - Tạo)")
+
+    # Kiểm tra các trường bắt buộc và làm sạch dữ liệu
+    first_name = member_data.get("firstName")
+    last_name = member_data.get("lastName")
+
+    if first_name == "..":
+        first_name = None
+    if last_name == "..":
+        last_name = None
+    
+    if not first_name or not last_name:
+        logging.error(f"Thành viên '{member_code}' thiếu 'firstName' hoặc 'lastName' bắt buộc (hoặc giá trị không hợp lệ). Bỏ qua thành viên này.")
+        return None
+
+    # Bước 1: Kiểm tra xem thành viên chính đã tồn tại chưa
+    existing_member_id = get_member_by_code(family_id, member_code)
+    
+    # Bỏ qua children và siblings như yêu cầu mới
+    member_data.pop("children", None)
+    member_data.pop("siblings", None)
+
+    # Lấy thông tin vợ/chồng từ member_data.get("spouse") hoặc member_data.get("spouses")
+    primary_spouse_data = member_data.get("spouse") 
+    additional_spouses_list = member_data.get("spouses", [])
+
+    # Ánh xạ giới tính từ tiếng Việt sang tiếng Anh
+    gender_map = {
+        "Nam": "Male",
+        "Nữ": "Female",
+        "Chân": "Other" # Thêm ánh xạ cho "Chân"
+    }
+    member_gender = member_data.get("gender")
+    processed_gender = gender_map.get(member_gender, member_gender) # Giữ nguyên nếu không tìm thấy trong map
+
+    member_payload = {
+        "lastName": last_name,
+        "firstName": first_name,
+        "id": None, # Thêm trường ID với giá trị null khi tạo mới
+        "code": member_code,
+        "nickname": member_data.get("nickname") or None,
+        "dateOfBirth": member_data.get("dateOfBirth") or None,
+        "dateOfDeath": member_data.get("dateOfDeath") or None,
+        "placeOfBirth": member_data.get("placeOfBirth") or None,
+        "placeOfDeath": member_data.get("placeOfDeath") or None,
+        "phone": member_data.get("phone") or None,
+        "email": member_data.get("email") or None,
+        "address": member_data.get("address") or None,
+        "gender": processed_gender or None,
+        "avatarUrl": member_data.get("avatarUrl") or None,
+        "avatarBase64": member_data.get("avatarBase64") or None,
+        "occupation": member_data.get("occupation") or None,
+        "biography": member_data.get("biography") or None,
+        "familyId": family_id, 
+        "isRoot": member_data.get("isRoot", False),
+        "isDeceased": member_data.get("isDeceased", False),
+        "order": member_data.get("order", 0),
+        "birthLocationId": member_data.get("birthLocationId") or None,
+        "deathLocationId": member_data.get("deathLocationId") or None,
+        "residenceLocationId": member_data.get("residenceLocationId") or None,
+        "fatherId": None, # Luôn là None trong lượt tạo đầu tiên
+        "motherId": None, # Luôn là None trong lượt tạo đầu tiên
+        "husbandId": None, # Luôn là None trong lượt tạo đầu tiên
+        "wifeId": None     # Luôn là None trong lượt tạo đầu tiên
+    }
+
+    logging.debug(f"Payload thành viên gửi đi: {json.dumps(member_payload, indent=2)}") # Log the payload
+
+    member_id_of_primary_member = existing_member_id
+    if not existing_member_id:
+        try:
+            response = requests.post(f"{BASE_URL}/member", headers=HEADERS, json=member_payload)
+            response.raise_for_status()
+            result = response.json()
+            if result.get("succeeded"):
+                member_id_of_primary_member = result.get("value")
+                logging.info(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_code}) thành công với ID: {member_id_of_primary_member}")
+            else:
+                logging.error(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_code}) thất bại: {result.get('errors')}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Lỗi khi gọi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_code}): {e}")
+            return None
+    else:
+        logging.info(f"Thành viên chính '{member_code}' đã tồn tại, ID: {existing_member_id}. Bỏ qua tạo mới.")
+    
+    if not member_id_of_primary_member:
+        return None
+
+    # Sau khi thành viên chính đã được tạo hoặc tìm thấy, thu thập thông tin quan hệ để cập nhật ở Lượt 2
+    relationship_data = {
+        "member_api_id": member_id_of_primary_member,
+        "member_code": member_code,
+        "gender": member_payload.get("gender"), # Giới tính của thành viên chính
+        "fatherId": member_data.get("fatherId"), # Lấy từ member_data để resolve sau
+        "motherId": member_data.get("motherId"), # Lấy từ member_data để resolve sau
+        "husbandId": None, # Sẽ được cập nhật từ primary_spouse_data hoặc additional_spouses_list
+        "wifeId": None     # Sẽ được cập nhật từ primary_spouse_data hoặc additional_spouses_list
+    }
+
+    # Xử lý vợ/chồng chính nếu có trong member_data (sẽ được cập nhật ở lượt 2)
+    if primary_spouse_data and primary_spouse_data.get("id"): # Giả sử ID API của vợ/chồng đã có
+        if relationship_data.get("gender") == "Male":
+            relationship_data["wifeId"] = primary_spouse_data["id"]
+        elif relationship_data.get("gender") == "Female":
+            relationship_data["husbandId"] = primary_spouse_data["id"]
+        else:
+            logging.warning(f"Không thể xác định giới tính của thành viên chính {member_code} để liên kết vợ/chồng chính.")
+    
+    pending_relationship_updates.append(relationship_data)
+
+    # Xử lý các vợ/chồng phụ (luôn tạo mới hoặc kiểm tra tồn tại, và thu thập để cập nhật mối quan hệ)
+    if additional_spouses_list:
+        logging.info(f"Thành viên {member_code} có {len(additional_spouses_list)} vợ/chồng phụ.")
+        for i, spouse_data in enumerate(additional_spouses_list):
+            spouse_code_suffix = spouse_data.get("code") or f"SP{i+1}"
+            spouse_code = f"{member_code}-{spouse_code_suffix}"
+            logging.info(f"Đang xử lý vợ/chồng phụ với mã: {spouse_code}")
+
+            existing_spouse_id = get_member_by_code(family_id, spouse_code)
+            spouse_api_id = existing_spouse_id
+            
+            spouse_first_name = spouse_data.get("firstName", "")
+            spouse_last_name = spouse_data.get("lastName", "")
+            if spouse_first_name == "..":
+                spouse_first_name = None
+            if spouse_last_name == "..":
+                spouse_last_name = None
+
+            spouse_payload = {
+                "lastName": spouse_last_name or None,
+                "firstName": spouse_first_name or None,
+                "id": None, # Thêm trường ID với giá trị null khi tạo mới spouse
+                "code": spouse_code,
+                "nickname": spouse_data.get("nickname") or None,
+                "dateOfBirth": spouse_data.get("dateOfBirth") or None,
+                "dateOfDeath": spouse_data.get("dateOfDeath") or None,
+                "placeOfBirth": spouse_data.get("placeOfBirth") or None,
+                "placeOfDeath": spouse_data.get("placeOfDeath") or None,
+                "phone": spouse_data.get("phone") or None,
+                "email": spouse_data.get("email") or None,
+                "address": spouse_data.get("address") or None,
+                "gender": spouse_data.get("gender") or None,
+                "avatarUrl": spouse_data.get("avatarUrl") or None,
+                "avatarBase64": spouse_data.get("avatarBase64") or None,
+                "occupation": spouse_data.get("occupation") or None,
+                "biography": spouse_data.get("biography") or None,
+                "familyId": family_id,
+                "isRoot": False, 
+                "isDeceased": spouse_data.get("isDeceased", False),
+                "order": spouse_data.get("order", 0),
+                "birthLocationId": spouse_data.get("birthLocationId") or None,
+                "deathLocationId": spouse_data.get("deathLocationId") or None,
+                "residenceLocationId": spouse_data.get("residenceLocationId") or None,
+                "fatherId": None, # Sẽ được cập nhật ở lượt 2
+                "motherId": None, # Sẽ được cập nhật ở lượt 2
+                "husbandId": None,
+                "wifeId": None
+            }
+
+            if not existing_spouse_id:
+                try:
+                    response = requests.post(f"{BASE_URL}/member", headers=HEADERS, json=spouse_payload)
+                    response.raise_for_status()
+                    result = response.json()
+                    if result.get("succeeded"):
+                        spouse_api_id = result.get("value")
+                        logging.info(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thành công với ID: {spouse_api_id}")
+                    else:
+                        logging.error(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thất bại: {result.get('errors')}")
+                        continue
+                except requests.exceptions.RequestException as e:
+                    logging.error(f"Lỗi khi gọi API tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}): {e}")
+                    continue
+            else:
+                logging.info(f"Vợ/chồng phụ '{spouse_code}' đã tồn tại, ID: {existing_spouse_id}. Bỏ qua tạo mới.")
+
+            if spouse_api_id:
+                spouse_relationship_data = {
+                    "member_api_id": spouse_api_id,
+                    "member_code": spouse_code,
+                    "gender": spouse_payload.get("gender"),
+                    "fatherId": spouse_data.get("fatherId"), # Lấy từ spouse_data để resolve sau
+                    "motherId": spouse_data.get("motherId"), # Lấy từ spouse_data để resolve sau
+                    "husbandId": None,
+                    "wifeId": None
+                }
+                # Thiết lập mối quan hệ một chiều từ vợ/chồng phụ đến thành viên chính (sẽ cập nhật ở lượt 2)
+                if member_payload.get("gender") == "Male": # Giới tính của thành viên chính
+                    spouse_relationship_data["husbandId"] = member_id_of_primary_member
+                elif member_payload.get("gender") == "Female":
+                    spouse_relationship_data["wifeId"] = member_id_of_primary_member
+                else:
+                    logging.warning(f"Không thể xác định giới tính của thành viên chính {member_code} để liên kết vợ/chồng phụ {spouse_code}.")
+                pending_relationship_updates.append(spouse_relationship_data)
+
+    return member_id_of_primary_member
+
+def main(target_folder: Optional[str] = None, member_limit: int = 0):
+    logging.info("Bắt đầu quá trình tích hợp dữ liệu gia đình và thành viên.")
+    
+    folders_to_process = []
+    if target_folder:
+        folders_to_process.append(target_folder)
+    else:
+        folders_to_process = os.listdir(OUTPUT_DIR)
+
+    for folder_name in folders_to_process:
+        folder_path = os.path.join(OUTPUT_DIR, folder_name)
+        if os.path.isdir(folder_path):
+            logging.info(f"Đang xử lý thư mục: {folder_name}")
+
+            # Đọc dữ liệu gia đình từ file family.json nếu có
+            data_folder_path = os.path.join(folder_path, "data")
+            family_json_path = os.path.join(data_folder_path, "family.json")
+            family_data = {}
+            if os.path.exists(family_json_path):
+                try:
+                    with open(family_json_path, 'r', encoding='utf-8') as f:
+                        family_data = json.load(f)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Lỗi đọc file family.json trong thư mục {folder_name}: {e}. Bỏ qua thư mục này.")
+                    continue
+            
+            # Thêm kiểm tra nếu family.json không tồn tại hoặc name empty thì bỏ qua
+            family_name = family_data.get("name")
+            if not family_name or family_name.strip() == "":
+                logging.warning(f"File family.json không tồn tại hoặc trường 'name' trống trong thư mục {folder_name}. Bỏ qua thư mục này.")
                 continue
 
-            # --- Process main_person ---
-            member_name_raw = main_person.get("name")
-            if member_name_raw is None or member_name_raw == "":
-                member_name = "Unknown Member"
+            family_id = create_family(folder_name, family_data)
+            if not family_id:
+                logging.error(f"Không thể tạo gia đình cho thư mục {folder_name}. Bỏ qua các thành viên trong thư mục này.")
+                continue
+
+            pha_he_json_path = os.path.join(data_folder_path, "pha_he.json")
+            if os.path.exists(pha_he_json_path):
+                try:
+                    with open(pha_he_json_path, 'r', encoding='utf-8') as f:
+                        pha_he_data = json.load(f)
+                        if pha_he_data: # Kiểm tra xem file có dữ liệu không
+                            logging.info(f"Tìm thấy và đang sử dụng pha_he.json trong {folder_name}, nhưng bỏ qua xử lý pha_he.json vì hàm xử lý chưa được triển khai.")
+                            # process_relationships_from_pha_he(family_id, folder_name, pha_he_data)
+                            # continue # Chuyển sang thư mục tiếp theo sau khi xử lý pha_he.json
+                        else:
+                            logging.info(f"File pha_he.json trong {folder_name} trống rỗng. Chuyển sang xử lý từng file thành viên.")
+                except json.JSONDecodeError as e:
+                    logging.error(f"Lỗi đọc file pha_he.json trong thư mục {folder_name}: {e}. Chuyển sang xử lý từng file thành viên.")
+                except Exception as e:
+                    logging.error(f"Lỗi không xác định khi xử lý pha_he.json trong thư mục {folder_name}: {e}. Chuyển sang xử lý từng file thành viên.")
+
+            # --- Xử lý từng file thành viên nếu pha_he.json không tồn tại hoặc trống/lỗi (theo 2 lượt) ---
+            logging.info(f"Đang xử lý từng file thành viên trong thư mục {folder_name} (theo 2 lượt).")
+            pending_relationship_updates = [] # Danh sách để lưu các cập nhật quan hệ cho Lượt 2
+
+            # Lượt 1: Tạo tất cả thành viên từ các file JSON riêng lẻ
+            members_folder_path = os.path.join(data_folder_path, "members") # Assuming members are in 'data/members'
+            if os.path.exists(members_folder_path) and os.path.isdir(members_folder_path):
+                member_count = 0 # Initialize counter
+                for file_name in os.listdir(members_folder_path):
+                    if member_limit > 0 and member_count >= member_limit: # Check limit
+                        logging.info(f"Đã đạt giới hạn {member_limit} thành viên. Dừng xử lý các thành viên còn lại.")
+                        break
+                    if file_name.endswith(".json"): # No need to exclude family.json and pha_he.json as it's 'members' folder
+                        file_path = os.path.join(members_folder_path, file_name)
+                        logging.info(f"Đang xử lý file thành viên: {file_name} (Lượt 1 - Tạo)")
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                member_data = json.load(f)
+                            # create_member now also populates pending_relationship_updates
+                            created_member_id = create_member(family_id, folder_name, file_name, member_data, pending_relationship_updates)
+                            if created_member_id: # Only count if member was successfully created (or found existing)
+                                member_count += 1
+                        except json.JSONDecodeError as e:
+                            logging.error(f"Lỗi đọc file JSON thành viên '{file_name}' trong thư mục {folder_name}: {e}")
+                        except Exception as e:
+                            logging.error(f"Lỗi không xác định khi xử lý file thành viên '{file_name}' trong thư mục {folder_name}: {e}")
             else:
-                member_name = str(member_name_raw) # Explicitly convert to string
-            last_name, first_name = parse_name(member_name)
-
-            # Logic to determine if a member is a root member
-            father_name = main_person.get("father_name")
-            generation = main_person.get("generation")
-            child_order = main_person.get("child_order")
-
-            is_root = False
-            if father_name == "Thuỷ tổ":
-                is_root = True
-            elif (generation is not None and str(generation).strip().isdigit() and int(str(generation).strip()) == 0 and 
-                  child_order is not None and str(child_order).strip().isdigit() and int(str(child_order).strip()) == 1):
-                is_root = True
-
-            print(f"DEBUG: Xử lý thành viên: '{member_name}' (ID gốc: {original_file_id}) -> Họ: '{last_name}', Tên: '{first_name}', isRoot: {is_root}", file=sys.stderr)
-
-            member_payload = {
-                "lastName": last_name,
-                "firstName": first_name,
-                "code": f"VNGP-{identifier_for_codes}-{original_file_id}", # Add member code
-                "familyId": family_id_for_payload,
-                "nickname": main_person.get("nickname"),
-                "dateOfBirth": format_date_for_api(main_person.get("dob")),
-                "dateOfDeath": format_date_for_api(main_person.get("dod")),
-                "placeOfDeath": main_person.get("burial_place"), # Map burial_place to placeOfDeath
-                "gender": "Male" if main_person.get("gender") == "Nam" else ("Female" if main_person.get("gender") == "Nữ" else "Other"),
-                "biography": main_person.get("description"),
-                "isDeceased": main_person.get("dod") is not None and main_person.get("dod") != "null" and main_person.get("dod") != "",
-                "order": main_person.get("child_order"),
-                "isRoot": is_root # NEW FIELD
-            }
-            # Remove None and empty string values from payload
-            member_payload = {k: v for k, v in member_payload.items() if v is not None and v != ""}
+                logging.warning(f"Thư mục 'members' không tồn tại trong {data_folder_path}. Bỏ qua xử lý các file thành viên riêng lẻ.")
             
-            # Check if main_person already exists
-            member_code_to_check = f"VNGP-{identifier_for_codes}-{original_file_id}"
-            existing_member = get_member_by_family_id_and_code(family_id_for_payload, member_code_to_check)
+            # Lượt 2: Cập nhật mối quan hệ cho các thành viên đã tạo
+            logging.info(f"Bắt đầu Lượt 2: Cập nhật mối quan hệ cho các thành viên trong thư mục {folder_name}.")
+            for rel_data in pending_relationship_updates:
+                member_api_id = rel_data["member_api_id"]
+                member_code = rel_data["member_code"]
+                update_payload = {"id": member_api_id}
 
-            if existing_member:
-                print(f"Thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}, Code: {member_code_to_check}) đã tồn tại với ID: {existing_member['id']}. Bỏ qua tạo mới.")
-                member_id_map[original_file_id] = existing_member["id"]
-            else:
-                created_member_guid = create_member(member_payload)
-                if created_member_guid:
-                    print(f"Đã tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}) với ID: {created_member_guid}")
-                    member_id_map[original_file_id] = created_member_guid
-                else:
-                    print(f"Không thể tạo thành viên '{last_name} {first_name}' (ID gốc: {original_file_id}). Bỏ qua.")
+                # Resolve fatherId and motherId 
+                father_id = rel_data.get("fatherId")
+                if father_id:
+                    update_payload["fatherId"] = father_id 
+                
+                mother_id = rel_data.get("motherId")
+                if mother_id:
+                    update_payload["motherId"] = mother_id 
 
-            # --- Process spouses ---
-            spouses = member_data_raw.get("spouses", [])
-            for idx, spouse_data in enumerate(spouses):
-                spouse_name_raw = spouse_data.get("name")
-                if spouse_name_raw is None or spouse_name_raw == "":
-                    spouse_name = "Unknown Spouse"
-                else:
-                    spouse_name = str(spouse_name_raw)
-                spouse_last_name, spouse_first_name = parse_name(spouse_name)
+                husband_id = rel_data.get("husbandId")
+                if husband_id:
+                    update_payload["husbandId"] = husband_id
+                
+                wife_id = rel_data.get("wifeId")
+                if wife_id:
+                    update_payload["wifeId"] = wife_id
 
-                # Generate a unique code for the spouse
-                spouse_original_id = f"{original_file_id}-spouse-{idx+1}"
-                spouse_code = f"VNGP-{identifier_for_codes}-{spouse_original_id}"
+                if len(update_payload) > 1: # Only update if there are relationship fields
+                    try:
+                        response = requests.put(f"{BASE_URL}/member/{member_api_id}", headers=HEADERS, json=update_payload)
+                        response.raise_for_status()
+                        try:
+                            result = response.json()
+                            if result.get("succeeded"):
+                                logging.info(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thành công.")
+                            else:
+                                logging.error(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thất bại: {result.get('errors')}")
+                        except json.JSONDecodeError:
+                            logging.error(f"Phản hồi API không phải JSON hợp lệ khi cập nhật mối quan hệ cho thành viên '{member_code}': {response.text}")
+                    except requests.exceptions.HTTPError as http_err:
+                        logging.error(f"Lỗi HTTP khi cập nhật mối quan hệ cho thành viên '{member_code}': {http_err}. Phản hồi: {response.text}")
+                    except requests.exceptions.RequestException as req_err:
+                        logging.error(f"Lỗi kết nối khi cập nhật mối quan hệ cho thành viên '{member_code}': {req_err}")
 
-                print(f"DEBUG: Xử lý vợ/chồng: '{spouse_name}' (ID gốc: {spouse_original_id}) -> Họ: '{spouse_last_name}', Tên: '{spouse_first_name}', isRoot: False", file=sys.stderr)
-
-                spouse_payload = {
-                    "lastName": spouse_last_name,
-                    "firstName": spouse_first_name,
-                    "code": spouse_code,
-                    "familyId": family_id_for_payload,
-                    "nickname": spouse_data.get("nickname"),
-                    "dateOfBirth": format_date_for_api(spouse_data.get("dob")),
-                    "dateOfDeath": format_date_for_api(spouse_data.get("dod")),
-                    "gender": "Male" if spouse_data.get("gender") == "Nam" else ("Female" if spouse_data.get("gender") == "Nữ" else "Other"),
-                    "biography": spouse_data.get("description"),
-                    "isDeceased": spouse_data.get("dod") is not None and spouse_data.get("dod") != "null" and spouse_data.get("dod") != "",
-                    "isRoot": False # Spouses are generally not roots themselves
-                }
-                # Remove None and empty string values from payload
-                spouse_payload = {k: v for k, v in spouse_payload.items() if v is not None and v != ""}
-
-                # Check if spouse already exists
-                existing_spouse = get_member_by_family_id_and_code(family_id_for_payload, spouse_code)
-
-                if existing_spouse:
-                    print(f"Thành viên '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}, Code: {spouse_code}) đã tồn tại với ID: {existing_spouse['id']}. Bỏ qua tạo mới.")
-                    member_id_map[spouse_original_id] = existing_spouse["id"]
-                else:
-                    created_spouse_guid = create_member(spouse_payload)
-                    if created_spouse_guid:
-                        print(f"Đã tạo vợ/chồng '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}) với ID: {created_spouse_guid}")
-                        member_id_map[spouse_original_id] = created_spouse_guid
-                    else:
-                        print(f"Không thể tạo vợ/chồng '{spouse_last_name} {spouse_first_name}' (ID gốc: {spouse_original_id}). Bỏ qua.")
-            
-        except Exception as e:
-            print(f"Lỗi khi xử lý tệp {member_file}: {e}", file=sys.stderr)
-            print("FULL PYTHON TRACEBACK:", file=sys.stdout)
-            print(traceback.format_exc(), file=sys.stdout)
-
-    print("\n--- Kết thúc tạo thành viên (Lượt 1) ---")
-
-    # 4. Cập nhật mối quan hệ (Pass 2: Update relationships)
-    print("\n--- Bắt thúc cập nhật mối quan hệ (Lượt 2) ---")
-
-    name_to_guid_map = {}
-    for original_id, guid in member_id_map.items():
-        raw_data = all_member_data_raw.get(original_id, {}).get("main_person", {})
-        full_name = raw_data.get("name")
-        if full_name:
-            if full_name in name_to_guid_map:
-                print(f"Cảnh báo: Tên '{full_name}' bị trùng lặp. Không thể xác định duy nhất GUID cho mối quan hệ.", file=sys.stderr)
-                name_to_guid_map[full_name].append(guid) # Store as list if duplicates
-            else:
-                name_to_guid_map[full_name] = [guid] # Always store as list to handle future duplicates
-
-    # This map needs to be simplified for lookup later, assuming unique names for relationships for now
-    # If a name has multiple GUIDs, this will pick the first one and warn.
-    simple_name_to_guid_map = {}
-    for name, guids in name_to_guid_map.items():
-        if len(guids) > 1:
-            print(f"Cảnh báo: Tên '{name}' có nhiều GUID ({guids}). Chỉ sử dụng GUID đầu tiên '{guids[0]}' cho mối quan hệ.", file=sys.stderr)
-        simple_name_to_guid_map[name] = guids[0]
-
-    for original_id, member_guid in member_id_map.items():
-        raw_data = all_member_data_raw.get(original_id, {})
-        main_person = raw_data.get("main_person", {})
-        
-        current_member_api_data = get_member(member_guid)
-        if not current_member_api_data:
-            print(f"Không thể lấy dữ liệu API cho thành viên {member_guid}. Bỏ qua cập nhật mối quan hệ.", file=sys.stderr)
-            continue
-
-        updated = False
-        # Resolve Father/Mother
-        father_name = main_person.get("father_name")
-        if father_name and father_name in simple_name_to_guid_map:
-            father_guid = simple_name_to_guid_map[father_name]
-            if current_member_api_data.get("fatherId") != father_guid:
-                current_member_api_data["fatherId"] = father_guid
-                print(f"  Cập nhật cha cho thành viên {member_guid} ('{main_person.get('name')}'): {father_guid} ('{father_name}')")
-                updated = True
-        elif father_name:
-            print(f"  Cảnh báo: Không tìm thấy cha '{father_name}' trong dữ liệu đã tạo cho thành viên {member_guid} ('{main_person.get('name')}').", file=sys.stderr)
-
-        # Resolve Spouses
-        spouses = raw_data.get("spouses", [])
-        if spouses:
-            for spouse in spouses:
-                spouse_name = spouse.get("name")
-                if spouse_name and spouse_name in simple_name_to_guid_map:
-                    spouse_guid = simple_name_to_guid_map[spouse_name]
-                    # This logic assumes the main person's gender is known and can determine husband/wife
-                    # For simplicity, if main_person is Male, assign wifeId, else husbandId.
-                    # This might need refinement based on actual data.
-                    main_person_gender = main_person.get("gender")
-                    if main_person_gender == "Nam" and current_member_api_data.get("wifeId") != spouse_guid:
-                        current_member_api_data["wifeId"] = spouse_guid
-                        print(f"  Cập nhật vợ cho thành viên {member_guid} ('{main_person.get('name')}'): {spouse_guid} ('{spouse_name}')")
-                        updated = True
-                        break # Assume only one wife can be assigned this way in initial pass
-                    elif main_person_gender == "Nữ" and current_member_api_data.get("husbandId") != spouse_guid:
-                        current_member_api_data["husbandId"] = spouse_guid
-                        print(f"  Cập nhật chồng cho thành viên {member_guid} ('{main_person.get('name')}'): {spouse_guid} ('{spouse_name}')")
-                        updated = True
-                        break # Assume only one husband can be assigned this way in initial pass
-                elif spouse_name:
-                    print(f"  Cảnh báo: Không tìm thấy vợ/chồng '{spouse_name}' trong dữ liệu đã tạo cho thành viên {member_guid} ('{main_person.get('name')}').", file=sys.stderr)
-        
-        # Children relationships are typically set from the child's side (FatherId/MotherId)
-        # or require a separate API/logic to manage. The current data structure doesn't easily support
-        # setting children from the parent's side during this update.
-
-        if updated:
-            success = update_member(member_guid, current_member_api_data)
-            if success:
-                print(f"  Đã cập nhật mối quan hệ cho thành viên {member_guid} ('{main_person.get('name')}').")
-            else:
-                print(f"  Không thể cập nhật mối quan hệ cho thành viên {member_guid} ('{main_person.get('name')}').")
-        else:
-            print(f"  Không có mối quan hệ nào cần cập nhật cho thành viên {member_guid} ('{main_person.get('name')}').")
-        
-        time.sleep(0.1) # Small delay to prevent API rate limiting issues
-
-    print("\n--- Kết thúc cập nhật mối quan hệ (Lượt 2) ---")
-    print("\nQuá trình tạo và cập nhật gia đình, thành viên đã hoàn tất.")
-    print("Ánh xạ ID gốc -> GUID thành viên đã tạo:")
-    for original_id, guid in member_id_map.items():
-        print(f"  {original_id}: {guid}")
+    logging.info("Hoàn tất quá trình tích hợp dữ liệu.")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Tích hợp dữ liệu gia đình và thành viên vào API.")
+    parser.add_argument("--folder", type=str, help="Chỉ định thư mục gia đình cần xử lý (ví dụ: '1'). Nếu không, tất cả các thư mục sẽ được xử lý.")
+    parser.add_argument("--member_limit", type=int, default=0, help="Giới hạn số lượng thành viên được tạo từ mỗi thư mục. Mặc định là 0 (không giới hạn).")
+    args = parser.parse_args()
+    main(target_folder=args.folder, member_limit=args.member_limit)

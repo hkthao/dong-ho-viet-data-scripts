@@ -1,0 +1,65 @@
+API Descriptions for Postman
+
+1. Get Family Location By Address
+
+   - **Endpoint:** GET http://localhost:8080/api/family-locations/by-address
+   - **Description:** Lấy thông tin về một Family Location dựa trên địa chỉ của nó.
+   - **Query Parameters:**
+     - `address` (string, required): Địa chỉ của Family Location cần tìm.
+   - **Example Usage:**
+     GET http://localhost:8080/api/family-locations/by-address?address=123%20Main%20St,%20Anytown
+   - **Expected Responses:**
+     - `200 OK`: Trả về một đối tượng FamilyLocationDto.
+       Example:
+       ```json
+       {
+           "id": "guid",
+           "familyId": "guid",
+           "locationId": "guid",
+           "name": "string",
+           "description": "string",
+           "latitude": 0.0,
+           "longitude": 0.0,
+           "address": "string",
+           "locationType": "Unknown", // Enum: Unknown, Birthplace, Residence, BurialPlace, EventLocation, ...
+           "accuracy": "Unknown", // Enum: Unknown, Low, Medium, High
+           "source": "Unknown" // Enum: Unknown, Manual, Geocoding, UserProvided
+       }
+       ```
+     - `404 Not Found`: Không tìm thấy Family Location với địa chỉ đã cung cấp.
+
+2. Create Family Location
+
+   - **Endpoint:** POST http://localhost:8080/api/family-locations
+   - **Description:** Tạo một Family Location mới.
+   - **Request Body (JSON):** `CreateFamilyLocationCommand`
+     - `familyId` (Guid, required): ID của gia đình liên quan.
+     - `locationName` (string, required): Tên của địa điểm.
+     - `locationDescription` (string, optional): Mô tả về địa điểm.
+     - `locationLatitude` (double, optional): Vĩ độ của địa điểm.
+     - `locationLongitude` (double, optional): Kinh độ của địa điểm.
+     - `locationAddress` (string, optional): Địa chỉ chi tiết của địa điểm.
+     - `locationType` (enum, required): Loại địa điểm (ví dụ: "Birthplace", "Residence").
+     - `locationAccuracy` (enum, required): Độ chính xác của địa điểm (ví dụ: "High", "Medium").
+     - `locationSource` (enum, required): Nguồn gốc của thông tin địa điểm (ví dụ: "Manual", "Geocoding").
+   - **Example Request Body:**
+     ```json
+     {
+         "familyId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+         "locationName": "Nhà của Ông Bà Nội",
+         "locationDescription": "Ngôi nhà nơi ông bà tôi sinh sống từ nhỏ",
+         "locationLatitude": 10.762622,
+         "locationLongitude": 106.660172,
+         "locationAddress": "123 Đường ABC, Quận 1, TP.HCM",
+         "locationType": "Residence",
+         "locationAccuracy": "High",
+         "locationSource": "Manual"
+     }
+     ```
+   - **Expected Responses:**
+     - `201 Created`: Trả về ID (Guid) của Family Location mới được tạo.
+       Example:
+       ```json
+       "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+       ```
+     - `400 Bad Request`: Yêu cầu không hợp lệ (ví dụ: thiếu trường bắt buộc, dữ liệu không đúng định dạng).
