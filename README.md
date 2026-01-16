@@ -16,15 +16,30 @@ Dự án này là một tập hợp các script Python được thiết kế đ�
     *   `output/<family_id>/raw_html/`: HTML thô cho một family ID.
     *   `output/<family_id>/raw_html/members/`: HTML thô của các thành viên trong gia đình.
     *   `output/<family_id>/data/`: Dữ liệu JSON đã trích xuất.
-*   `vietnamgiapha/`: Chứa các script Python chính cho việc thu thập và trích xuất.
-    *   `crawl_pipeline.py`: Quản lý quy trình thu thập dữ liệu HTML.
-    *   `crawl_member_details.py`: Thu thập chi tiết thành viên.
-    *   `crawl_giapha.py`: Thu thập các trang chính của gia phả.
-    *   `extract_pipeline.py`: Quản lý quy trình trích xuất thông tin từ HTML.
-    *   `extract_giapha_info_ollama.py`: Trích xuất thông tin gia phả bằng Ollama.
-    *   `extract_member_info_ollama.py`: Trích xuất thông tin thành viên bằng Ollama.
-    *   `main_pipeline.py`: Điều phối toàn bộ quy trình (thu thập và trích xuất) cho một ID hoặc dải ID.
-    *   `utils.py`: Các hàm tiện ích.
+*   `vietnamgiapha/`: Thư mục chứa các module chính của hệ thống.
+    *   `vietnamgiapha/crawling/`: Chứa các script chuyên trách thu thập dữ liệu web.
+        *   `crawl_giapha.py`: Thu thập các trang chính của gia phả.
+        *   `crawl_member_details.py`: Thu thập chi tiết thành viên.
+    *   `vietnamgiapha/extraction/`: Chứa các script trích xuất dữ liệu có cấu trúc từ HTML thô.
+        *   `vietnamgiapha/extraction/rule_based/`: Trích xuất dữ liệu dựa trên quy tắc (BeautifulSoup, regex).
+            *   `extract_family.py`: Trích xuất thông tin cấp gia đình.
+            *   `extract_member.py`: Trích xuất thông tin chi tiết thành viên.
+        *   `vietnamgiapha/extraction/llm_based/`: Trích xuất dữ liệu sử dụng mô hình ngôn ngữ lớn (Ollama).
+            *   `extract_family_ollama.py`: Trích xuất thông tin gia phả bằng Ollama.
+            *   `extract_member_ollama.py`: Trích xuất thông tin thành viên bằng Ollama.
+    *   `vietnamgiapha/pipelines/`: Chứa các script điều phối các quy trình nhiều bước.
+        *   `crawl_pipeline.py`: Quản lý quy trình thu thập dữ liệu HTML.
+        *   `extract_pipeline.py`: Quản lý quy trình trích xuất thông tin từ HTML.
+        *   `main_pipeline.py`: Điều phối toàn bộ quy trình (thu thập và trích xuất) cho một ID hoặc dải ID.
+    *   `vietnamgiapha/api_integration/`: Chứa các script tương tác với API bên ngoài để tạo/cập nhật dữ liệu.
+        *   `create_family_members.py`: Tạo gia đình và thành viên qua API.
+    *   `vietnamgiapha/utils/`: Chứa các hàm tiện ích và trợ giúp dùng chung.
+        *   `utils.py`: Các hàm tiện ích chung.
+    *   `vietnamgiapha/config/`: Chứa các tệp cấu hình, schema và các tài nguyên khác.
+        *   `requirements.txt`: Các thư viện Python cần thiết.
+        *   `schema-family.txt`: Schema JSON cho dữ liệu gia đình.
+        *   `schema-member.txt`: Schema JSON cho dữ liệu thành viên.
+    *   `vietnamgiapha/data/samples/`: Chứa các tệp HTML mẫu dùng để kiểm thử và phát triển.
 *   `failed_crawls.txt`: Ghi lại các ID gia đình không thể thu thập được.
 
 ## Công nghệ sử dụng
@@ -64,12 +79,12 @@ Sử dụng `main_pipeline.py` để chạy cả hai giai đoạn:
 
 *   **Cho một Family ID cụ thể**:
     ```bash
-    python3 vietnamgiapha/main_pipeline.py <family_id>
+    python3 vietnamgiapha/pipelines/main_pipeline.py <family_id>
     # Ví dụ: python3 vietnamgiapha/main_pipeline.py 1714
     ```
 *   **Cho một dải Family ID**:
     ```bash
-    python3 vietnamgiapha/main_pipeline.py <start_id> <end_id>
+    python3 vietnamgiapha/pipelines/main_pipeline.py <start_id> <end_id>
     # Ví dụ: python3 vietnamgiapha/main_pipeline.py 1 100
     ```
 
@@ -78,12 +93,12 @@ Sử dụng `crawl_pipeline.py` để chỉ thu thập dữ liệu HTML:
 
 *   **Cho một Family ID cụ thể**:
     ```bash
-    python3 vietnamgiapha/crawl_pipeline.py <family_id>
+    python3 vietnamgiapha/pipelines/crawl_pipeline.py <family_id>
     # Ví dụ: python3 vietnamgiapha/crawl_pipeline.py 1714
     ```
 *   **Cho một dải Family ID**:
     ```bash
-    python3 vietnamgiapha/crawl_pipeline.py <start_id> <end_id>
+    python3 vietnamgiapha/pipelines/crawl_pipeline.py <start_id> <end_id>
     # Ví dụ: python3 vietnamgiapha/crawl_pipeline.py 1 12000
     ```
 
@@ -92,13 +107,13 @@ Sử dụng `extract_pipeline.py` để chỉ trích xuất dữ liệu từ HTM
 
 *   **Cho một Family ID cụ thể**:
     ```bash
-    python3 vietnamgiapha/extract_pipeline.py <family_id> [limit]
+    python3 vietnamgiapha/pipelines/extract_pipeline.py <family_id> [limit]
     # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1714
     # Ví dụ với giới hạn 10 thành viên: python3 vietnamgiapha/extract_pipeline.py 1714 10
     ```
 *   **Cho một dải Family ID**:
     ```bash
-    python3 vietnamgiapha/extract_pipeline.py <start_id> <end_id> [limit]
+    python3 vietnamgiapha/pipelines/extract_pipeline.py <start_id> <end_id> [limit]
     # Ví dụ: python3 vietnamgiapha/extract_pipeline.py 1 100
     # Ví dụ với giới hạn 10 thành viên cho mỗi gia đình: python3 vietnamgiapha/extract_pipeline.py 1 100 10
     ```
