@@ -19,7 +19,8 @@ HEADERS = {
 
 OUTPUT_DIR = "output"
 
-member_id_map = {} # Global map to store member_code -> member_id for pha_he.json processing and relationship resolution
+# Global map to store member_code (string) -> member_api_id (GUID)
+member_code_to_api_id_global_map = {}
 
 def get_family_by_code(family_code: str) -> Optional[str]:
     """
@@ -220,6 +221,7 @@ def create_member(family_id: str, folder_name: str, file_name: str, member_data:
             if result.get("succeeded"):
                 member_id_of_primary_member = result.get("value")
                 logging.info(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_code}) thành công với ID: {member_id_of_primary_member}")
+                member_code_to_api_id_global_map[member_code] = member_id_of_primary_member
             else:
                 logging.error(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_code}) thất bại: {result.get('errors')}")
                 return None
@@ -228,6 +230,7 @@ def create_member(family_id: str, folder_name: str, file_name: str, member_data:
             return None
     else:
         logging.info(f"Thành viên chính '{member_code}' đã tồn tại, ID: {existing_member_id}. Bỏ qua tạo mới.")
+        member_code_to_api_id_global_map[member_code] = existing_member_id
     
     if not member_id_of_primary_member:
         return None
@@ -237,20 +240,10 @@ def create_member(family_id: str, folder_name: str, file_name: str, member_data:
         "member_api_id": member_id_of_primary_member,
         "member_code": member_code,
         "gender": member_payload.get("gender"), # Giới tính của thành viên chính
-        "fatherId": member_data.get("fatherId"), # Lấy từ member_data để resolve sau
-        "motherId": member_data.get("motherId"), # Lấy từ member_data để resolve sau
-        "husbandId": None, # Sẽ được cập nhật từ primary_spouse_data hoặc additional_spouses_list
-        "wifeId": None     # Sẽ được cập nhật từ primary_spouse_data hoặc additional_spouses_list
+        "father_code": member_data.get("father", {}).get("code"), # Lấy code từ đối tượng 'father'
+        "mother_code": member_data.get("mother", {}).get("code"), # Lấy code từ đối tượng 'mother'
+        "spouse_codes": [] # Sẽ thu thập mã của tất cả vợ/chồng (chính và phụ)
     }
-
-    # Xử lý vợ/chồng chính nếu có trong member_data (sẽ được cập nhật ở lượt 2)
-    if primary_spouse_data and primary_spouse_data.get("id"): # Giả sử ID API của vợ/chồng đã có
-        if relationship_data.get("gender") == "Male":
-            relationship_data["wifeId"] = primary_spouse_data["id"]
-        elif relationship_data.get("gender") == "Female":
-            relationship_data["husbandId"] = primary_spouse_data["id"]
-        else:
-            logging.warning(f"Không thể xác định giới tính của thành viên chính {member_code} để liên kết vợ/chồng chính.")
     
     pending_relationship_updates.append(relationship_data)
 
@@ -311,6 +304,7 @@ def create_member(family_id: str, folder_name: str, file_name: str, member_data:
                     if result.get("succeeded"):
                         spouse_api_id = result.get("value")
                         logging.info(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thành công với ID: {spouse_api_id}")
+                        member_code_to_api_id_global_map[spouse_code] = spouse_api_id
                     else:
                         logging.error(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thất bại: {result.get('errors')}")
                         continue
@@ -319,24 +313,25 @@ def create_member(family_id: str, folder_name: str, file_name: str, member_data:
                     continue
             else:
                 logging.info(f"Vợ/chồng phụ '{spouse_code}' đã tồn tại, ID: {existing_spouse_id}. Bỏ qua tạo mới.")
+                member_code_to_api_id_global_map[spouse_code] = existing_spouse_id
 
             if spouse_api_id:
+                # Add this spouse's code to the primary member's spouse_codes list
+                # Find the primary member's rel_data in pending_relationship_updates
+                # Assuming the primary member's rel_data is always the first one appended for this family processing cycle
+                for primary_member_rel_data in pending_relationship_updates:
+                    if primary_member_rel_data["member_api_id"] == member_id_of_primary_member:
+                        primary_member_rel_data["spouse_codes"].append(spouse_code)
+                        break
+
                 spouse_relationship_data = {
                     "member_api_id": spouse_api_id,
                     "member_code": spouse_code,
                     "gender": spouse_payload.get("gender"),
-                    "fatherId": spouse_data.get("fatherId"), # Lấy từ spouse_data để resolve sau
-                    "motherId": spouse_data.get("motherId"), # Lấy từ spouse_data để resolve sau
-                    "husbandId": None,
-                    "wifeId": None
+                    "father_code": spouse_data.get("father", {}).get("code"), # Lấy code từ đối tượng 'father'
+                    "mother_code": spouse_data.get("mother", {}).get("code"), # Lấy code từ đối tượng 'mother'
+                    "spouse_codes": [member_code] # Vợ/chồng phụ này kết hôn với thành viên chính
                 }
-                # Thiết lập mối quan hệ một chiều từ vợ/chồng phụ đến thành viên chính (sẽ cập nhật ở lượt 2)
-                if member_payload.get("gender") == "Male": # Giới tính của thành viên chính
-                    spouse_relationship_data["husbandId"] = member_id_of_primary_member
-                elif member_payload.get("gender") == "Female":
-                    spouse_relationship_data["wifeId"] = member_id_of_primary_member
-                else:
-                    logging.warning(f"Không thể xác định giới tính của thành viên chính {member_code} để liên kết vợ/chồng phụ {spouse_code}.")
                 pending_relationship_updates.append(spouse_relationship_data)
 
     return member_id_of_primary_member
@@ -430,22 +425,40 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
                 member_code = rel_data["member_code"]
                 update_payload = {"id": member_api_id}
 
-                # Resolve fatherId and motherId 
-                father_id = rel_data.get("fatherId")
-                if father_id:
-                    update_payload["fatherId"] = father_id 
+                # Resolve fatherId
+                father_code = rel_data.get("father_code")
+                if father_code and father_code.strip() != "" and father_code != "null":
+                    father_api_id = member_code_to_api_id_global_map.get(father_code)
+                    if father_api_id:
+                        update_payload["fatherId"] = father_api_id
+                    else:
+                        logging.warning(f"Không tìm thấy API ID cho cha có mã '{father_code}' của thành viên '{member_code}'.")
                 
-                mother_id = rel_data.get("motherId")
-                if mother_id:
-                    update_payload["motherId"] = mother_id 
+                # Resolve motherId
+                mother_code = rel_data.get("mother_code")
+                if mother_code and mother_code.strip() != "" and mother_code != "null":
+                    mother_api_id = member_code_to_api_id_global_map.get(mother_code)
+                    if mother_api_id:
+                        update_payload["motherId"] = mother_api_id
+                    else:
+                        logging.warning(f"Không tìm thấy API ID cho mẹ có mã '{mother_code}' của thành viên '{member_code}'.")
 
-                husband_id = rel_data.get("husbandId")
-                if husband_id:
-                    update_payload["husbandId"] = husband_id
-                
-                wife_id = rel_data.get("wifeId")
-                if wife_id:
-                    update_payload["wifeId"] = wife_id
+                # Resolve husbandId / wifeId (spouses)
+                if rel_data.get("spouse_codes"):
+                    for spouse_code_to_resolve in rel_data["spouse_codes"]:
+                        if spouse_code_to_resolve and spouse_code_to_resolve.strip() != "" and spouse_code_to_resolve != "null":
+                            spouse_api_id = member_code_to_api_id_global_map.get(spouse_code_to_resolve)
+                            if spouse_api_id:
+                                # Determine if it's husbandId or wifeId based on the current member's gender
+                                if rel_data.get("gender") == "Male":
+                                    update_payload["wifeId"] = spouse_api_id
+                                elif rel_data.get("gender") == "Female":
+                                    update_payload["husbandId"] = spouse_api_id
+                                else:
+                                    logging.warning(f"Không thể xác định giới tính của thành viên '{member_code}' để liên kết vợ/chồng '{spouse_code_to_resolve}'.")
+                            else:
+                                logging.warning(f"Không tìm thấy API ID cho vợ/chồng có mã '{spouse_code_to_resolve}' của thành viên '{member_code}'.")
+
 
                 if len(update_payload) > 1: # Only update if there are relationship fields
                     try:
