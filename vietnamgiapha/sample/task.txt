@@ -1,0 +1,319 @@
+# 1. Mục tiêu
+
+Gemini CLI cần thực hiện:
+
+👉 Nhận **HTML gia phả (raw)**
+👉 Dùng **Python + BeautifulSoup** để parse
+👉 Trích xuất dữ liệu **theo text label tiếng Việt**
+👉 Xuất ra **JSON đúng schema**
+
+---
+
+# 2. Yêu cầu kỹ thuật
+
+* Python ≥ 3.9
+* Thư viện:
+
+```bash
+pip install beautifulsoup4 lxml
+```
+
+---
+
+# 3. Nguyên tắc bắt buộc (Gemini phải tuân theo)
+
+1. ❌ **KHÔNG dựa vào class / id HTML**
+2. ✅ **CHỈ dựa vào nội dung text tiếng Việt**
+3. ✅ **Duyệt `<tr>` theo thứ tự xuất hiện**
+4. ✅ **Dùng state machine (section-based parsing)**
+5. ✅ **Output luôn đúng schema, đủ field (kể cả null / empty)**
+
+---
+
+# 4. Schema output chuẩn (bắt buộc)
+
+```python
+OUTPUT_SCHEMA = {
+    "lastName": "",
+    "firstName": "",
+    "code": "",
+    "nickname": "",
+    "dateOfBirth": None,
+    "dateOfDeath": None,
+    "dateOfDeathLunar": None,
+    "placeOfBirth": None,
+    "placeOfDeath": None,
+    "phone": "",
+    "email": "",
+    "address": "",
+    "gender": "",
+    "avatarUrl": "",
+    "avatarBase64": "",
+    "occupation": "",
+    "biography": "",
+    "isRoot": False,
+    "isDeceased": False,
+    "order": 0,
+    "generation": 0,
+    "father": None,
+    "mother": None,
+    "spouses": []
+}
+```
+
+---
+
+# 5. Chiến lược xử lý HTML
+
+## 5.1 Parse DOM
+
+```python
+soup = BeautifulSoup(html, "lxml")
+rows = soup.find_all("tr")
+```
+
+---
+
+## 5.2 Khai báo state (rất quan trọng)
+
+```python
+current_section = None
+current_spouse = None
+```
+
+Section có thể là:
+
+```python
+FAMILY
+PERSON
+SPOUSE
+CHILDREN
+```
+
+---
+
+# 6. Nhận diện section bằng TEXT
+
+Gemini CLI phải dò **text trong `<tr>`**
+
+```python
+row_text = row.get_text(strip=True)
+```
+
+| Text chứa             | Section  |
+| --------------------- | -------- |
+| Chi tiết gia đình     | FAMILY   |
+| Người trong gia đình  | PERSON   |
+| Liên quan (chồng, vợ) | SPOUSE   |
+| Con cái               | CHILDREN |
+
+---
+
+# 7. Mapping chi tiết từng field
+
+## 7.1 Họ – tên – giới tính
+
+HTML:
+
+```
+Tên | Cao Triết (Nam)
+```
+
+### Quy tắc:
+
+* Text trong `()` → gender
+* Phần còn lại → full name
+* Từ đầu tiên → lastName
+* Phần còn lại → firstName
+
+```python
+def parse_name_gender(text):
+    gender = extract_between_parentheses(text)
+    name = remove_parentheses(text)
+    parts = name.split()
+    return {
+        "lastName": parts[0],
+        "firstName": " ".join(parts[1:]),
+        "gender": gender
+    }
+```
+
+---
+
+## 7.2 Nickname
+
+```
+Tên thường | Lý Triết
+```
+
+```python
+output["nickname"] = value
+```
+
+---
+
+## 7.3 Generation (Đời thứ)
+
+```
+Đời thứ: 0
+```
+
+```python
+output["generation"] = int(value)
+```
+
+---
+
+## 7.4 Order (Là con thứ)
+
+```python
+output["order"] = int(value)
+```
+
+---
+
+## 7.5 Ngày sinh / ngày mất
+
+```python
+if label == "Ngày sinh":
+    output["dateOfBirth"] = normalize_date(value)
+
+if label == "Ngày mất":
+    output["dateOfDeath"] = normalize_date(value)
+    output["isDeceased"] = True
+```
+
+---
+
+## 7.6 Hưởng thọ → isDeceased
+
+```python
+if label == "Hưởng thọ":
+    output["isDeceased"] = True
+```
+
+---
+
+## 7.7 Nơi an táng → placeOfDeath
+
+```python
+if label == "Nơi an táng":
+    output["placeOfDeath"] = value
+```
+
+---
+
+## 7.8 Biography (ghi chú dài)
+
+Pattern:
+
+```
+Sự nghiệp, công đức, ghi chú
+<tr><td>TEXT DÀI</td></tr>
+```
+
+```python
+if label == "Sự nghiệp, công đức, ghi chú":
+    next_row = rows[i + 1]
+    output["biography"] = clean_text(next_row.get_text())
+```
+
+---
+
+## 7.9 Father
+
+HTML:
+
+```
+Là con của: Thuỷ tổ
+```
+
+```python
+output["father"] = {
+    "lastName": extract_last_name(value),
+    "firstName": extract_first_name(value),
+    "code": None,
+    "gender": "Nam"
+}
+```
+
+```python
+output["isRoot"] = False
+```
+
+Nếu không có dòng này:
+
+```python
+output["isRoot"] = True
+```
+
+---
+
+## 7.10 Spouses (vợ / chồng)
+
+### Khi gặp:
+
+```
+Liên quan (chồng, vợ)
+```
+
+Tạo object spouse mới khi gặp `"Tên"`
+
+```python
+current_spouse = {
+    "lastName": "",
+    "firstName": "",
+    "gender": "",
+    "dateOfBirth": None,
+    "dateOfDeath": None,
+    "biography": ""
+}
+```
+
+Mapping giống PERSON nhưng đơn giản hơn.
+
+Khi gặp spouse mới → push spouse cũ vào `output["spouses"]`.
+
+---
+
+# 8. Chuẩn hoá dữ liệu (bắt buộc)
+
+Gemini CLI phải:
+
+* Trim string
+* `""` cho text rỗng
+* `None` cho date không có
+* Remove `&nbsp;`, tag XML lạ
+* Không bỏ field nào trong schema
+
+---
+
+# 9. Sinh code (nếu cần)
+
+```python
+output["code"] = generate_member_code(
+    lastName=output["lastName"],
+    gender=output["gender"],
+    generation=output["generation"],
+    order=output["order"]
+)
+```
+
+---
+
+# 10. Output cuối cùng
+
+```python
+return json.dumps(output, ensure_ascii=False, indent=2)
+```
+
+---
+
+# 11. Checklist để Gemini CLI tự kiểm tra
+
+☑ Có đủ field schema
+☑ Không crash nếu thiếu dữ liệu
+☑ Chạy được với nhiều page cùng format
+☑ Không hardcode index HTML
+
+---
