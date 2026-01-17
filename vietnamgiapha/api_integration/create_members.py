@@ -270,26 +270,25 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                     member_id_of_primary_member = cleaned_response_text
                     logging.info(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code')}) thành công với ID: {member_id_of_primary_member} (từ GUID trực tiếp).")
                     member_code_to_api_id_map[member_data.get("code")] = member_id_of_primary_member
-                    return member_id_of_primary_member # Return immediately on successful GUID creation
             
-            # If not a direct GUID, try to parse as JSON
-            try:
-                result = response.json()
-                logging.debug(f"Phản hồi JSON API khi tạo thành viên chính '{member_payload['firstName']} {member_payload['lastName']}': {json.dumps(result, indent=2)}")
-                if result.get("succeeded"):
-                    member_id_of_primary_member = result.get("value")
-                    logging.info(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code')}) thành công với ID: {member_id_of_primary_member}")
-                    member_code_to_api_id_map[member_data.get("code")] = member_id_of_primary_member
-                else:
-                    logging.error(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code')}) thất bại: {result.get('errors')}. Phản hồi thô: {response.text}")
-            except json.JSONDecodeError as json_err:
-                logging.error(f"Lỗi khi xử lý phản hồi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code') }): {json_err}. Phản hồi thô: {response.text}")
-            except Exception as e:
-                logging.error(f"Lỗi không xác định khi xử lý phản hồi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code') }): {e}. Phản hồi thô: {response.text}")
+            # If not a direct GUID, try to parse as JSON or handle other 2xx responses
+            else:
+                try:
+                    result = response.json()
+                    logging.debug(f"Phản hồi JSON API khi tạo thành viên chính '{member_payload['firstName']} {member_payload['lastName']}': {json.dumps(result, indent=2)}")
+                    if result.get("succeeded"):
+                        member_id_of_primary_member = result.get("value")
+                        logging.info(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code')}) thành công với ID: {member_id_of_primary_member}")
+                        member_code_to_api_id_map[member_data.get("code")] = member_id_of_primary_member
+                    else:
+                        logging.error(f"Tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code')}) thất bại: {result.get('errors')}. Phản hồi thô: {response.text}")
+                except json.JSONDecodeError as json_err:
+                    logging.error(f"Lỗi khi xử lý phản hồi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code') }): {json_err}. Phản hồi thô: {response.text}")
+                except Exception as e:
+                    logging.error(f"Lỗi không xác định khi xử lý phản hồi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code') }): {e}. Phản hồi thô: {response.text}")
         except requests.exceptions.RequestException as e:
             logging.error(f"Lỗi khi gọi API tạo thành viên '{member_payload['firstName']} {member_payload['lastName']}' ({member_data.get('code') }): {e}")
-            return None
-    else:
+            member_id_of_primary_member = None # Ensure it's None on failure    else:
         logging.info(f"Thành viên chính '{member_data.get('code') }' đã tồn tại, ID: {existing_member_id}. Bỏ qua tạo mới.")
         member_code_to_api_id_map[member_data.get("code")] = existing_member_id
     
@@ -463,6 +462,7 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                     "mother_code": (spouse_data.get("mother") or {}).get("code"), # Lấy code từ đối tượng 'mother', an toàn với null
                     "spouse_codes": [member_code] # Vợ/chồng phụ này kết hôn với thành viên chính
                 }
+                logging.debug(f"Đang thêm spouse_relationship_data vào pending_relationship_updates: {json.dumps(spouse_relationship_data, indent=2)}")
                 pending_relationship_updates.append(spouse_relationship_data)
 
     return member_id_of_primary_member
@@ -511,6 +511,7 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
 
             members_folder_path = os.path.join(data_folder_path, "members")
             if os.path.isdir(members_folder_path):
+                logging.debug(f"Files found in members folder: {os.listdir(members_folder_path)}")
                 member_count = 0
                 for member_json_filename in sorted(os.listdir(members_folder_path)):
                     if member_json_filename.endswith(".json"):
