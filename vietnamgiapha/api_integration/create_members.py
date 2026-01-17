@@ -243,7 +243,7 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
         "occupation": member_data.get("occupation") or None,
         "biography": member_data.get("biography") or None,
         "familyId": family_id, 
-        "isRoot": member_data.get("isRoot", False),
+        "isRoot": member_code == f"GPVN-{family_id}-1", # Set isRoot to True if member_code matches "GPVN-{familyId}-1"
         "isDeceased": member_data.get("isDeceased", False),
         "order": member_data.get("order", 0),
         "birthLocationId": member_data.get("birthLocationId") or None,
@@ -423,9 +423,7 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                             spouse_api_id = cleaned_response_text
                             logging.info(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thành công với ID: {spouse_api_id} (từ GUID trực tiếp).")
                             member_code_to_api_id_map[spouse_code] = spouse_api_id
-                            # No return here, as we need to process other spouses and primary member's relationships.
-                            # Just continue to the next step which checks if spouse_api_id is set.
-                            continue # Skip the JSON parsing part and go to the next spouse if successful GUID response
+                            # NO MORE 'continue' HERE
                     
                     # If not a direct GUID, try to parse as JSON
                     try:
@@ -437,13 +435,13 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                             member_code_to_api_id_map[spouse_code] = spouse_api_id
                         else:
                             logging.error(f"Tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}) thất bại: {result.get('errors')}. Phản hồi thô: {response.text}")
-                            continue
+                            # NO MORE 'continue' HERE
                     except json.JSONDecodeError as json_err:
                         logging.error(f"Lỗi khi xử lý phản hồi API tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}): {json_err}. Phản hồi thô: {response.text}")
-                        continue
+                        # NO MORE 'continue' HERE
                     except Exception as e:
                         logging.error(f"Lỗi không xác định khi xử lý phản hồi API tạo vợ/chồng phụ '{spouse_payload['firstName']} {spouse_payload['lastName']}' ({spouse_code}): {e}. Phản hồi thô: {response.text}")
-                        continue
+                        # NO MORE 'continue' HERE
             else:
                 logging.info(f"Vợ/chồng phụ '{spouse_code}' đã tồn tại, ID: {existing_spouse_id}. Bỏ qua tạo mới.")
                 member_code_to_api_id_map[spouse_code] = existing_spouse_id
@@ -461,7 +459,6 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                     "member_api_id": spouse_api_id,
                     "member_code": spouse_code,
                     "gender": spouse_payload.get("gender"),
-                    "family_api_id": family_id, # Thêm family_api_id vào đây
                     "father_code": (spouse_data.get("father") or {}).get("code"), # Lấy code từ đối tượng 'father', an toàn với null
                     "mother_code": (spouse_data.get("mother") or {}).get("code"), # Lấy code từ đối tượng 'mother', an toàn với null
                     "spouse_codes": [member_code] # Vợ/chồng phụ này kết hôn với thành viên chính
@@ -549,9 +546,20 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
             # Lưu dữ liệu trung gian cho script cập nhật mối quan hệ
             relationships_file = os.path.join(data_folder_path, "_relationships_to_update.json")
             member_map_file = os.path.join(data_folder_path, "_member_code_map.json")
+
+            # Xóa các file trung gian cũ để đảm bảo dữ liệu mới
+            if os.path.exists(relationships_file):
+                os.remove(relationships_file)
+                logging.info(f"Đã xóa file trung gian cũ: '{relationships_file}'.")
+            if os.path.exists(member_map_file):
+                os.remove(member_map_file)
+                logging.info(f"Đã xóa file trung gian cũ: '{member_map_file}'.")
+            # --- END DELETION ---
+
             try:
                 with open(relationships_file, 'w', encoding='utf-8') as f:
                     json.dump(pending_relationship_updates, f, ensure_ascii=False, indent=2)
+                logging.debug(f"Nội dung của '{relationships_file}' trước khi lưu: {json.dumps(pending_relationship_updates, indent=2)}")
                 logging.info(f"Đã lưu {len(pending_relationship_updates)} mối quan hệ vào '{relationships_file}'.")
                 
                 with open(member_map_file, 'w', encoding='utf-8') as f:

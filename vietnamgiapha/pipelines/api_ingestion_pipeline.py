@@ -14,11 +14,18 @@ def run_script(script_path: str, args: list = None):
     if args is None:
         args = []
     
-    command = ["python3", script_path] + args
-    logging.info(f"Đang chạy lệnh: {' '.join(command)}")
+    command = ["python3", "-m", script_path] + args # Sử dụng python3 -m và truyền đường dẫn module trực tiếp
+    
+    # Thiết lập PYTHONPATH cho subprocess
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(current_script_dir, "..", ".."))
+    env = os.environ.copy()
+    env["PYTHONPATH"] = project_root
+    
+    logging.info(f"Đang chạy lệnh: {' '.join(command)} với PYTHONPATH={env['PYTHONPATH']}")
     try:
         # Chạy script như một tiến trình con
-        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
+        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', env=env)
         logging.info(f"Script '{script_path}' hoàn tất thành công.")
         if process.stdout:
             logging.info(f"Stdout từ '{script_path}':\n{process.stdout}")
@@ -45,9 +52,8 @@ def main():
     
     args = parser.parse_args()
 
-    current_dir = os.path.dirname(__file__)
-    create_members_script = os.path.join(current_dir, "../api_integration", "create_members.py")
-    update_relationships_script = os.path.join(current_dir, "../api_integration", "update_relationships.py")
+    create_members_script = "vietnamgiapha.api_integration.create_members"
+    update_relationships_script = "vietnamgiapha.api_integration.update_relationships"
 
     # Bước 1: Chạy create_members.py
     logging.info("--- Bắt đầu Bước 1: Tạo thành viên và thu thập mối quan hệ ---")

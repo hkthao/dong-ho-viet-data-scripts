@@ -91,7 +91,7 @@ async def _crawl_and_save_html(session: aiohttp.ClientSession, url: str, output_
         return False
 
 
-async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str):
+async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_html_path: str, force: bool = False):
     """
     Reads pha_he.html, extracts member detail URLs, crawls them asynchronously, and saves to members_output_dir.
 
@@ -99,6 +99,7 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
         family_id (str): The ID of the family.
         members_output_dir (str): The directory where member HTML files will be saved.
         pha_he_html_path (str): Path to the pha_he.html file (which contains links to members).
+        force (bool): If True, forces crawling even if files already exist.
     """
     try:
         with open(pha_he_html_path, 'r', encoding='utf-8') as f:
@@ -133,7 +134,7 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 member_id = str(member_id_int)
                 output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
 
-                if check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
+                if not force and check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
                     consecutive_member_failures = 0 # Reset on existing file (implies previous success)
                     continue 
 
@@ -184,7 +185,7 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
                 # Construct the output file path for this member
                 output_filepath = os.path.join(members_output_dir, f"{member_id}.html")
                 
-                if check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
+                if not force and check_file_exists(output_filepath, f"Thành viên {member_id} HTML"):
                     consecutive_member_failures = 0 # Reset on existing file (implies previous success)
                     continue # Skip if file already exists
                 
@@ -202,12 +203,13 @@ async def crawl_member_details(family_id: str, members_output_dir: str, pha_he_h
     return all_members_crawled_successfully
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python crawl_member_details.py <family_id> <members_output_dir> <pha_he_html_path>")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Thu thập chi tiết thành viên từ VietnamGiapha.com.")
+    parser.add_argument("family_id", type=str, help="ID của gia đình cần thu thập.")
+    parser.add_argument("members_output_dir", type=str, help="Thư mục đầu ra cho các file HTML thành viên.")
+    parser.add_argument("pha_he_html_path", type=str, help="Đường dẫn đến file pha_he.html chứa các link thành viên.")
+    parser.add_argument("--force", action="store_true", help="Buộc thu thập lại dữ liệu ngay cả khi file đã tồn tại.")
     
-    family_id_to_crawl = sys.argv[1]
-    members_output_directory = sys.argv[2]
-    pha_he_html_file = sys.argv[3]
+    args = parser.parse_args()
     
-    asyncio.run(crawl_member_details(family_id_to_crawl, members_output_directory, pha_he_html_file))
+    asyncio.run(crawl_member_details(args.family_id, args.members_output_dir, args.pha_he_html_path, args.force))

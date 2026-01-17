@@ -23,6 +23,35 @@ HEADERS = {
 
 OUTPUT_DIR = "output"
 
+def get_family_by_code(family_code: str) -> Optional[str]:
+    """
+    Kiểm tra xem gia đình có tồn tại không và trả về Family ID nếu có.
+    """
+    try:
+        response = requests.get(f"{BASE_URL}/family/by-code/{family_code}", headers=HEADERS)
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                logging.debug(f"Phản hồi JSON API cho gia đình '{family_code}': {json.dumps(result, indent=2)}")
+                if result.get("id"):
+                    logging.info(f"Gia đình với mã '{family_code}' đã tồn tại, ID: {result['id']}")
+                    return result["id"]
+            except json.JSONDecodeError:
+                logging.error(f"Phản hồi API không phải JSON hợp lệ khi kiểm tra gia đình '{family_code}': {response.text}")
+                return None
+        elif response.status_code == 404:
+            logging.info(f"Gia đình với mã '{family_code}' chưa tồn tại.")
+            return None
+        else:
+            logging.error(f"Lỗi khi kiểm tra gia đình '{family_code}': {response.status_code} - {response.text}")
+            return None
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"Lỗi HTTP khi kiểm tra gia đình '{family_code}': {http_err}. Phản hồi: {response.text}")
+        return None
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Lỗi kết nối khi gọi API kiểm tra gia đình '{family_code}': {req_err}")
+        return None
+
 def main(target_folder: Optional[str] = None, limit: Optional[int] = None):
     logging.info("Bắt đầu quá trình cập nhật mối quan hệ thành viên.")
     
@@ -36,6 +65,12 @@ def main(target_folder: Optional[str] = None, limit: Optional[int] = None):
         folder_path = os.path.join(OUTPUT_DIR, folder_name)
         if os.path.isdir(folder_path):
             logging.info(f"Đang xử lý thư mục: {folder_name}")
+
+            family_code = f"GPVN-{folder_name}"
+            current_family_api_id = get_family_by_code(family_code)
+            if not current_family_api_id:
+                logging.error(f"Không thể lấy Family ID cho thư mục '{folder_name}'. Bỏ qua cập nhật mối quan hệ.")
+                continue
 
             data_folder_path = os.path.join(folder_path, "data")
             relationships_file = os.path.join(data_folder_path, "_relationships_to_update.json")
@@ -121,20 +156,23 @@ def main(target_folder: Optional[str] = None, limit: Optional[int] = None):
                     try:
                         request_body = {
                             "memberId": member_api_id,
-                            "familyId": rel_data["family_api_id"], # Lấy family_api_id từ rel_data
+                            "familyId": current_family_api_id, # Lấy family_api_id từ biến đã lấy một lần cho cả folder
                             **update_payload
                         }
                         logging.debug(f"Đang gửi request_body cho thành viên '{member_code}' (ID: {member_api_id}): {json.dumps(request_body, indent=2)}")
                         response = requests.put(f"{BASE_URL}/member/{member_api_id}/relationships", headers=HEADERS, json=request_body)
                         response.raise_for_status()
-                        try:
-                            result = response.json()
-                            if result.get("succeeded"):
-                                logging.info(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thành công.")
-                            else:
-                                logging.error(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thất bại: {result.get('errors')}")
-                        except json.JSONDecodeError:
-                            logging.error(f"Phản hồi API không phải JSON hợp lệ khi cập nhật mối quan hệ cho thành viên '{member_code}': {response.text}")
+                        if response.status_code == 204:
+                            logging.info(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thành công (204 No Content).")
+                        else:
+                            try:
+                                result = response.json()
+                                if result.get("succeeded"):
+                                    logging.info(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thành công.")
+                                else:
+                                    logging.error(f"Cập nhật mối quan hệ cho thành viên '{member_code}' thất bại: {result.get('errors')}")
+                            except json.JSONDecodeError:
+                                logging.error(f"Phản hồi API không phải JSON hợp lệ khi cập nhật mối quan hệ cho thành viên '{member_code}': {response.text}")
                     except requests.exceptions.HTTPError as http_err:
                         logging.error(f"Lỗi HTTP khi cập nhật mối quan hệ cho thành viên '{member_code}': {http_err}. Phản hồi: {response.text}")
                     except requests.exceptions.RequestException as req_err:
