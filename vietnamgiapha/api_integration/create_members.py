@@ -42,6 +42,17 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
         folder_path = os.path.join(OUTPUT_DIR, folder_name)
         logger.info(f"Đang xử lý thư mục: {folder_name}")
 
+        # Kiểm tra xem thư mục 'members' có file nào không
+        members_folder_path = os.path.join(folder_path, "data", "members")
+        if not os.path.isdir(members_folder_path):
+            logger.warning(f"Thư mục 'members' không tồn tại trong {folder_path}. Bỏ qua việc tạo gia đình này.")
+            continue
+        
+        member_files = [f for f in os.listdir(members_folder_path) if f.endswith(".json")]
+        if not member_files:
+            logger.warning(f"Thư mục 'members' trong {folder_path} không chứa file thành viên nào. Bỏ qua việc tạo gia đình này.")
+            continue
+
         family_data = data_loader.load_family_data(folder_path)
         if not family_data:
             logger.error(f"Không thể tải family.json từ thư mục {folder_name}. Bỏ qua.")
@@ -65,8 +76,7 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
                 "code": family_code,
                 "description": family_data.get("description"),
                 "address": family_data.get("address"),
-                "visibility": family_data.get("visibility", "Private"),
-                "locationId": family_data.get("locationId")
+                "visibility": family_data.get("visibility", "Private")
             }
             family_id = api_services.create_family_api_call(family_payload)
         
