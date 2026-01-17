@@ -32,9 +32,9 @@ OUTPUT_SCHEMA = {
 
 # Helper functions
 def extract_between_parentheses(text):
-    """Trích xuất văn bản trong dấu ngoặc đơn."""
-    match = re.search(r'\((.*?)\)', text)
-    return match.group(1).strip() if match else ""
+    """Trích xuất văn bản trong dấu ngoặc đơn cuối cùng."""
+    matches = re.findall(r'\((.*?)\)', text)
+    return matches[-1].strip() if matches else ""
 
 def remove_parentheses(text):
     """Xóa phần trong dấu ngoặc đơn khỏi văn bản."""
