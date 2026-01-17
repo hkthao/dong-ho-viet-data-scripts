@@ -1,0 +1,104 @@
+# API Endpoint: Lấy danh sách thành viên theo ID gia đình
+
+## Mô tả
+API này dùng để lấy danh sách tất cả các thành viên thuộc về một gia đình cụ thể dựa trên `familyId`.
+
+## Yêu cầu
+
+*   **Phương thức HTTP:** `GET`
+*   **URL:** `{{base_url}}/api/member/by-family/:familyId`
+    *   Thay thế `{{base_url}}` bằng URL cơ sở của API của bạn (ví dụ: `http://localhost:8080`).
+    *   Thay thế `:familyId` bằng ID thực tế của gia đình (một GUID).
+
+*   **Headers:**
+    *   `Authorization`: `Bearer {{auth_token}}`
+        *   Thay thế `{{auth_token}}` bằng mã token JWT hợp lệ của người dùng đã được xác thực.
+
+### Ví dụ Request
+
+```http
+GET {{base_url}}/api/member/by-family/3fa85f64-5717-4562-b3fc-2c963f66afa6
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Phản hồi
+
+### Thành công (Status: 200 OK)
+Trả về một mảng các đối tượng thành viên.
+
+**Body (JSON):**
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa7",
+    "firstName": "Nguyen",
+    "lastName": "Van A",
+    "fullName": "Nguyen Van A",
+    "gender": "Male",
+    "dateOfBirth": "1990-01-01T00:00:00Z",
+    "placeOfBirth": "Hanoi",
+    "dateOfDeath": null,
+    "placeOfDeath": null,
+    "biography": "Tiểu sử của thành viên A.",
+    "avatarUrl": "http://example.com/avatarA.jpg",
+    "memberCode": "M001",
+    "familyId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "createdBy": "user1",
+    "created": "2023-01-01T10:00:00Z",
+    "lastModifiedBy": "user1",
+    "lastModified": "2023-01-01T10:00:00Z"
+  },
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa8",
+    "firstName": "Tran",
+    "lastName": "Thi B",
+    "fullName": "Tran Thi B",
+    "gender": "Female",
+    "dateOfBirth": "1992-05-15T00:00:00Z",
+    "placeOfBirth": "Ho Chi Minh",
+    "dateOfDeath": null,
+    "placeOfDeath": null,
+    "biography": "Tiểu sử của thành viên B.",
+    "avatarUrl": "http://example.com/avatarB.jpg",
+    "memberCode": "M002",
+    "familyId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "createdBy": "user1",
+    "created": "2023-01-02T11:00:00Z",
+    "lastModifiedBy": "user1",
+    "lastModified": "2023-01-02T11:00:00Z"
+  }
+]
+```
+
+### Lỗi (Status: 401 Unauthorized)
+Nếu mã token JWT không hợp lệ hoặc thiếu.
+**Body (JSON):**
+```json
+{
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+### Lỗi (Status: 403 Forbidden)
+Nếu người dùng không có quyền truy cập vào gia đình này.
+**Body (JSON):**
+```json
+{
+  "title": "Forbidden",
+  "status": 403,
+  "detail": "You do not have permission to access this resource."
+}
+```
+
+### Lỗi (Status: 404 Not Found)
+Nếu `familyId` không tồn tại.
+**Body (JSON):**
+```json
+{
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Family with ID '3fa85f64-5717-4562-b3fc-2c963f66afa6' not found."
+}
+```
