@@ -18,65 +18,6 @@ OUTPUT_DIR = "output"
 
 
 
-def infer_mother_code_from_father_data(father_code: str, current_folder_name: str) -> Optional[str]:
-    """
-    Suy luận mã của mẹ từ dữ liệu của cha, dựa trên vợ/chồng của cha trong file JSON cục bộ.
-    """
-    if not father_code or father_code.strip() == "" or father_code == "null":
-        return None
-
-    try:
-        # Example: GPVN-1-1 -> father_folder_name = "1", father_member_filename = "1"
-        parts = father_code.split('-')
-        if len(parts) >= 3 and parts[0] == 'GPVN':
-            father_folder_name = parts[1]
-            father_member_index = parts[2] # Assuming member_filename is just the index
-
-            # Check if the father is in the same folder as the current member
-            # This is a simplification; a more robust solution might handle cross-folder fathers
-            if father_folder_name == current_folder_name:
-                father_member_json_path = os.path.join(
-                    OUTPUT_DIR,
-                    father_folder_name,
-                    "data",
-                    "members",
-                    f"{father_member_index}.json"
-                )
-
-                father_member_data = data_loader.load_json_file(father_member_json_path)
-                if father_member_data:
-                    father_spouses = []
-                    if father_member_data.get("spouse"):
-                        father_spouses.append(father_member_data.get("spouse"))
-                    if father_member_data.get("spouses"):
-                        father_spouses.extend(father_member_data.get("spouses"))
-
-                    for spouse_data in father_spouses:
-                        # Assuming the first female spouse is the mother
-                        # This might need refinement based on data conventions
-                        # Use gender_map to normalize gender from original_member_data
-                        gender_map = {
-                            "Nam": "Male",
-                            "Nữ": "Female",
-                            "Chân": "Other"
-                        }
-                        spouse_gender = spouse_data.get("gender")
-                        processed_spouse_gender = gender_map.get(spouse_gender, spouse_gender)
-
-                        if processed_spouse_gender == "Female":
-                            inferred_mother_code = spouse_data.get("code")
-                            if inferred_mother_code:
-                                logger.info(f"Suy luận 'mother_code': '{inferred_mother_code}' từ vợ/chồng của cha '{father_code}'.")
-                                return inferred_mother_code
-                else:
-                    logger.warning(f"Không tìm thấy hoặc không thể tải file JSON của cha tại '{father_member_json_path}'. Không thể suy luận 'mother_code'.")
-            else:
-                logger.warning(f"Cha '{father_code}' không ở cùng thư mục '{current_folder_name}'. Không hỗ trợ suy luận 'mother_code' cho cha ở thư mục khác.")
-        else:
-            logger.warning(f"Mã cha '{father_code}' không đúng định dạng 'GPVN-folder-member_index'. Không thể suy luận 'mother_code'.")
-    except Exception as e:
-        logger.error(f"Lỗi khi suy luận 'mother_code' từ dữ liệu của cha '{father_code}': {e}.")
-    return None
 
 def main(target_folder: Optional[str] = None):
     logger.info("Bắt đầu quá trình cập nhật mối quan hệ thành viên.")
@@ -102,6 +43,9 @@ def main(target_folder: Optional[str] = None):
             if not current_family_api_id:
                 logger.error(f"Không thể lấy Family ID cho thư mục '{folder_name}'. Bỏ qua cập nhật mối quan hệ.")
                 continue
+
+            pending_reverse_updates = [] # Initialize the list to store reverse relationship updates
+
 
             # Fetch all existing members for this family from the API
             all_fetched_members = api_services.get_members_by_family_id(current_family_api_id)
@@ -150,11 +94,15 @@ def main(target_folder: Optional[str] = None):
                             logger.warning(f"Không tìm thấy thành viên với mã '{member_code}' trong API. Bỏ qua cập nhật mối quan hệ.")
                             continue
                         
+                        is_root_member = original_member_data.get("isRoot", False)
+
                         update_payload = {}
                         processed_member_data = original_member_data.copy() # Create a copy to store resolved IDs
 
                         # Resolve fatherId
                         father_code = (original_member_data.get("father") or {}).get("code")
+                        if is_root_member: # If it's a root member, they shouldn't have a father
+                            father_code = None
                         if father_code and father_code.strip() != "" and father_code != "null":
                             father_api_id = get_member_id_by_code(father_code)
                             if father_api_id:
@@ -165,12 +113,24 @@ def main(target_folder: Optional[str] = None):
                         
                         # Resolve motherId
                         mother_code = (original_member_data.get("mother") or {}).get("code")
-                        if not mother_code or mother_code.strip() == "" or mother_code == "null":
-                            # Try to infer mother_code from father's data if father_code is present
-                            if father_code and father_code.strip() != "" and father_code != "null":
-                                inferred_mother_code = infer_mother_code_from_father_data(father_code, folder_name)
-                                if inferred_mother_code:
-                                    mother_code = inferred_mother_code
+                        if is_root_member: # If it's a root member, they shouldn't have a mother
+                            mother_code = None
+
+                        # Infer mother_code if not present but father_code is available
+                        if not mother_code and father_code and father_code.strip() != "" and father_code != "null":
+                            inferred_mother_code = f"{father_code}-S1"
+                            inferred_mother_api_id = None
+                            inferred_mother_gender = None
+
+                            for fetched_member in all_fetched_members:
+                                if fetched_member.get("code") == inferred_mother_code:
+                                    inferred_mother_api_id = fetched_member.get("id")
+                                    inferred_mother_gender = fetched_member.get("gender")
+                                    break
+                            
+                            if inferred_mother_api_id and inferred_mother_gender == "Female":
+                                mother_code = inferred_mother_code
+                                logger.info(f"Đã suy luận mẹ chính '{inferred_mother_code}' cho thành viên '{member_code}' dựa trên vợ của cha '{father_code}'.")
 
                         if mother_code and mother_code.strip() != "" and mother_code != "null":
                             mother_api_id = get_member_id_by_code(mother_code)
@@ -183,36 +143,78 @@ def main(target_folder: Optional[str] = None):
                         # Resolve husbandId / wifeId (spouses)
                         # The original data might have 'spouse' (single) or 'spouses' (list)
                         spouses_to_resolve = []
+
+                        member_gender = original_member_data.get("gender")
+                        processed_member_gender = gender_map.get(member_gender, member_gender)
+
+                        # Simple inference for primary spouse based on naming convention
+                        if processed_member_gender == "Male" and member_code:
+                            inferred_spouse_code = f"{member_code}-S1"
+                            inferred_spouse_member_api_id = None
+                            inferred_spouse_gender = None
+
+                            # Find the inferred spouse in all_fetched_members
+                            for fetched_member in all_fetched_members:
+                                if fetched_member.get("code") == inferred_spouse_code:
+                                    inferred_spouse_member_api_id = fetched_member.get("id")
+                                    inferred_spouse_gender = fetched_member.get("gender")
+                                    break
+                            
+                            if inferred_spouse_member_api_id and inferred_spouse_gender == "Female":
+                                spouses_to_resolve.append({"code": inferred_spouse_code, "id": inferred_spouse_member_api_id, "gender": inferred_spouse_gender})
+                                logger.info(f"Đã suy luận vợ chính '{inferred_spouse_code}' cho thành viên '{member_code}' dựa trên quy ước đặt tên.")
+                        
                         if original_member_data.get("spouse"):
                             spouses_to_resolve.append(original_member_data.get("spouse"))
                         if original_member_data.get("spouses"):
                             spouses_to_resolve.extend(original_member_data.get("spouses"))
                         
+                        member_gender = original_member_data.get("gender") 
+                        processed_member_gender = gender_map.get(member_gender, member_gender)
+
+                        resolved_wife_api_id = None
+                        resolved_husband_api_id = None
+
                         if spouses_to_resolve:
-                            member_gender = original_member_data.get("gender") 
-                            processed_member_gender = gender_map.get(member_gender, member_gender)
-                            
-                            resolved_spouse_id = None
                             for spouse_data in spouses_to_resolve:
                                 spouse_code = spouse_data.get("code")
                                 if spouse_code and spouse_code.strip() != "" and spouse_code != "null":
                                     current_spouse_api_id = get_member_id_by_code(spouse_code)
                                     if current_spouse_api_id:
                                         # Only assign the first found spouse as primary (API limitation)
-                                        if not resolved_spouse_id:
-                                            if processed_member_gender == "Male":
-                                                update_payload["wifeId"] = current_spouse_api_id
-                                                processed_member_data["wifeId"] = current_spouse_api_id
-                                            elif processed_member_gender == "Female":
-                                                update_payload["husbandId"] = current_spouse_api_id
-                                                processed_member_data["husbandId"] = current_spouse_api_id
-                                            else:
-                                                logger.warning(f"Không thể xác định giới tính của thành viên '{member_code}' để liên kết vợ/chồng '{spouse_code}'. Giới tính đã xử lý: '{processed_member_gender}'")
-                                            resolved_spouse_id = current_spouse_api_id
+                                        if processed_member_gender == "Male" and not resolved_wife_api_id:
+                                            resolved_wife_api_id = current_spouse_api_id
+                                        elif processed_member_gender == "Female" and not resolved_husband_api_id:
+                                            resolved_husband_api_id = current_spouse_api_id
                                         else:
                                             logger.warning(f"Thành viên '{member_code}' có nhiều vợ/chồng được định nghĩa. Chỉ vợ/chồng đầu tiên ('{spouse_code}' được tìm thấy) được gán làm vợ/chồng chính.")
                                     else:
                                         logger.warning(f"Không tìm thấy API ID cho vợ/chồng có mã '{spouse_code}' của thành viên '{member_code}'.")
+
+
+                        
+
+                        
+                        # Apply resolved IDs to update_payload
+                        if resolved_wife_api_id:
+                            update_payload["wifeId"] = resolved_wife_api_id
+                            processed_member_data["wifeId"] = resolved_wife_api_id
+                            # Queue reverse update for the wife
+                            pending_reverse_updates.append({
+                                "member_api_id": resolved_wife_api_id,
+                                "family_api_id": current_family_api_id,
+                                "update_payload": {"husbandId": member_api_id}
+                            })
+                        
+                        if resolved_husband_api_id:
+                            update_payload["husbandId"] = resolved_husband_api_id
+                            processed_member_data["husbandId"] = resolved_husband_api_id
+                            # Queue reverse update for the husband
+                            pending_reverse_updates.append({
+                                "member_api_id": resolved_husband_api_id,
+                                "family_api_id": current_family_api_id,
+                                "update_payload": {"wifeId": member_api_id}
+                            })
                         
                         if update_payload:
                             if api_services.update_member_relationships(member_api_id, current_family_api_id, update_payload):
@@ -232,6 +234,21 @@ def main(target_folder: Optional[str] = None):
                             logger.error(f"Lỗi khi lưu dữ liệu thành viên đã xử lý cho '{member_code}': {e}")
             else:
                 logger.warning(f"Thư mục 'members' không tồn tại trong {data_folder_path}. Bỏ qua xử lý các file thành viên.")
+
+            # Process pending reverse relationship updates
+            if pending_reverse_updates:
+                logger.info(f"Đang xử lý {len(pending_reverse_updates)} cập nhật mối quan hệ ngược lại cho thư mục {folder_name}.")
+                for reverse_update_data in pending_reverse_updates:
+                    member_api_id_to_update = reverse_update_data["member_api_id"]
+                    family_api_id_for_update = reverse_update_data["family_api_id"]
+                    update_payload_for_reverse = reverse_update_data["update_payload"]
+
+                    if api_services.update_member_relationships(member_api_id_to_update, family_api_id_for_update, update_payload_for_reverse):
+                        logger.info(f"Cập nhật mối quan hệ ngược lại cho thành viên '{member_api_id_to_update}' thành công với payload: {update_payload_for_reverse}.")
+                    else:
+                        logger.error(f"Cập nhật mối quan hệ ngược lại cho thành viên '{member_api_id_to_update}' thất bại với payload: {update_payload_for_reverse}.")
+            else:
+                logger.info(f"Không có cập nhật mối quan hệ ngược lại nào để xử lý cho thư mục {folder_name}.")
         else:
             logger.debug(f"Bỏ qua '{folder_name}' vì nó không phải là thư mục.")
 
