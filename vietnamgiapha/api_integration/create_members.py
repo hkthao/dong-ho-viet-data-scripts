@@ -349,6 +349,7 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
         "member_api_id": member_id_of_primary_member,
         "member_code": member_data.get("code"),
         "gender": member_payload.get("gender"),
+        "family_api_id": family_id, # Thêm family_api_id vào đây
         "father_code": resolved_father_code,
         "mother_code": resolved_mother_code,
         "spouse_codes": []
@@ -460,6 +461,7 @@ def create_member_and_collect_relationships(family_id: str, member_data: dict,
                     "member_api_id": spouse_api_id,
                     "member_code": spouse_code,
                     "gender": spouse_payload.get("gender"),
+                    "family_api_id": family_id, # Thêm family_api_id vào đây
                     "father_code": (spouse_data.get("father") or {}).get("code"), # Lấy code từ đối tượng 'father', an toàn với null
                     "mother_code": (spouse_data.get("mother") or {}).get("code"), # Lấy code từ đối tượng 'mother', an toàn với null
                     "spouse_codes": [member_code] # Vợ/chồng phụ này kết hôn với thành viên chính
@@ -520,7 +522,6 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
                             break
                         
                         member_json_file_path = os.path.join(members_folder_path, member_json_filename)
-                        member_code_from_filename = os.path.splitext(member_json_filename)[0] # e.g., "GPVN-1691-1"
 
                         try:
                             with open(member_json_file_path, 'r', encoding='utf-8') as f:

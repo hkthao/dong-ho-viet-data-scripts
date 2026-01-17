@@ -118,9 +118,14 @@ def main(target_folder: Optional[str] = None, limit: Optional[int] = None):
 
 
                 if len(update_payload) > 0: 
-                    logging.debug(f"Đang gửi update_payload cho thành viên '{member_code}' (ID: {member_api_id}): {json.dumps(update_payload, indent=2)}")
                     try:
-                        response = requests.put(f"{BASE_URL}/member/{member_api_id}", headers=HEADERS, json=update_payload)
+                        request_body = {
+                            "memberId": member_api_id,
+                            "familyId": rel_data["family_api_id"], # Lấy family_api_id từ rel_data
+                            **update_payload
+                        }
+                        logging.debug(f"Đang gửi request_body cho thành viên '{member_code}' (ID: {member_api_id}): {json.dumps(request_body, indent=2)}")
+                        response = requests.put(f"{BASE_URL}/member/{member_api_id}/relationships", headers=HEADERS, json=request_body)
                         response.raise_for_status()
                         try:
                             result = response.json()

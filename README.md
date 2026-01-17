@@ -31,8 +31,10 @@ Dự án này là một tập hợp các script Python được thiết kế đ�
         *   `crawl_pipeline.py`: Quản lý quy trình thu thập dữ liệu HTML.
         *   `extract_pipeline.py`: Quản lý quy trình trích xuất thông tin từ HTML.
         *   `main_pipeline.py`: Điều phối toàn bộ quy trình (thu thập và trích xuất) cho một ID hoặc dải ID.
+        *   `api_ingestion_pipeline.py`: Chạy pipeline tạo thành viên và cập nhật mối quan hệ qua API.
     *   `vietnamgiapha/api_integration/`: Chứa các script tương tác với API bên ngoài để tạo/cập nhật dữ liệu.
-        *   `create_family_members.py`: Tạo gia đình và thành viên qua API.
+        *   `create_members.py`: Tạo gia đình và thành viên qua API (Lượt 1).
+        *   `update_relationships.py`: Cập nhật mối quan hệ cha, mẹ, vợ/chồng cho thành viên qua API (Lượt 2).
     *   `vietnamgiapha/utils/`: Chứa các hàm tiện ích và trợ giúp dùng chung.
         *   `utils.py`: Các hàm tiện ích chung.
     *   `vietnamgiapha/config/`: Chứa các tệp cấu hình, schema và các tài nguyên khác.
@@ -126,21 +128,29 @@ Sử dụng `extract_pipeline_rulebase.py` để chỉ trích xuất dữ liệu
     # Ví dụ: PYTHONPATH=. python3 vietnamgiapha/pipelines/extract_pipeline_rulebase.py --output_base_dir output --force
     ```
 
-### 3.2. Chỉ chạy pipeline trích xuất dữ liệu (LLM-based Extraction - `extract_pipeline.py`)
-Sử dụng `extract_pipeline.py` để chỉ trích xuất dữ liệu từ HTML đã thu thập (sử dụng các script trích xuất dựa trên LLM):
+### 4. Chạy pipeline nhập liệu API (tạo thành viên và cập nhật mối quan hệ)
+Sử dụng `api_ingestion_pipeline.py` để tạo thành viên và thiết lập mối quan hệ:
 
 *   **Cho một Family ID cụ thể**:
     ```bash
-    python3 vietnamgiapha/pipelines/extract_pipeline.py <family_id> [limit]
-    # Ví dụ: python3 vietnamgiapha/pipelines/extract_pipeline.py 1714
-    # Ví dụ với giới hạn 10 thành viên: python3 vietnamgiapha/pipelines/extract_pipeline.py 1714 10
+    python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --folder <family_id>
+    # Ví dụ: python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --folder 1714
     ```
-*   **Cho một dải Family ID**:
+*   **Cho tất cả các thư mục gia đình**:
     ```bash
-    # Hiện tại không hỗ trợ trực tiếp dải ID thông qua script này.
-    # Bạn cần lặp qua các ID bằng script bash/shell bên ngoài hoặc sửa đổi script.
-    # Ví dụ: for i in {1..100}; do python3 vietnamgiapha/pipelines/extract_pipeline.py $i; done
+    python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py
     ```
+*   **Với giới hạn số lượng thành viên (chỉ áp dụng khi không dùng --folder)**:
+    ```bash
+    python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --member_limit <số_lượng>
+    # Ví dụ: python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --member_limit 100
+    ```
+*   **Với giới hạn số lượng mối quan hệ để debug/test (chỉ áp dụng khi không dùng --folder)**:
+    ```bash
+    python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --relation_limit <số_lượng>
+    # Ví dụ: python3 vietnamgiapha/pipelines/api_ingestion_pipeline.py --relation_limit 50
+    ```
+
 
 ## Đóng góp
 Các đóng góp được hoan nghênh! Vui lòng tạo một pull request hoặc mở một issue.

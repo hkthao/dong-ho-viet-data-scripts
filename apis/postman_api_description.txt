@@ -1,0 +1,69 @@
+API Description for Postman: Cập nhật Mối quan hệ Thành viên (Update Member Relationships)
+
+Endpoint:
+PUT /api/member/{id}/relationships
+
+Mô tả:
+API này cho phép cập nhật các mối quan hệ của một thành viên cụ thể trong gia phả, bao gồm cha, mẹ, vợ hoặc chồng. Đây là một API nhỏ gọn, tập trung vào việc quản lý các mối quan hệ mà không cần cập nhật các thông tin khác của thành viên.
+
+Authorization (Ủy quyền):
+*   Yêu cầu token JWT hợp lệ trong header `Authorization` (ví dụ: `Bearer <your_token>`).
+*   Người dùng phải có quyền `CanManageFamily` cho `FamilyId` được cung cấp.
+
+Request:
+
+*   HTTP Method: `PUT`
+*   URL: `https://your-api-base-url/api/member/{id}/relationships`
+    *   Thay thế `{id}` bằng `Guid` của thành viên bạn muốn cập nhật.
+*   Headers:
+    *   `Content-Type: application/json`
+    *   `Authorization: Bearer <your_jwt_token>`
+*   Body (JSON):
+    ```json
+    {
+      "memberId": "Guid của thành viên cần cập nhật",
+      "familyId": "Guid của gia đình mà thành viên thuộc về",
+      "fatherId": "Guid của người cha mới (hoặc null để xóa mối quan hệ cha)",
+      "motherId": "Guid của người mẹ mới (hoặc null để xóa mối quan hệ mẹ)",
+      "husbandId": "Guid của người chồng mới (hoặc null để xóa mối quan hệ chồng - chỉ áp dụng cho thành viên nữ)",
+      "wifeId": "Guid của người vợ mới (hoặc null để xóa mối quan hệ vợ - chỉ áp dụng cho thành viên nam)"
+    }
+    ```
+
+Validation (Xác thực):
+*   `memberId` trong URL phải khớp với `memberId` trong body. Nếu không khớp, sẽ trả về `400 Bad Request`.
+*   `memberId` và `familyId` trong body không được để trống. Nếu để trống, sẽ trả về `400 Bad Request`.
+*   Nếu `fatherId`, `motherId`, `husbandId`, `wifeId` được cung cấp, chúng phải là `Guid` hợp lệ của các thành viên tồn tại trong cùng `familyId`. Nếu không tồn tại, sẽ trả về `404 Not Found` (được xử lý bởi `CommandHandler`).
+*   Người dùng phải có quyền quản lý gia đình (`CanManageFamily`) cho `familyId` được cung cấp. Nếu không, sẽ trả về `403 Forbidden`.
+
+Response:
+
+*   Thành công (Success):
+    *   `204 No Content` - Nếu việc cập nhật thành công.
+*   Lỗi (Errors):
+    *   `400 Bad Request` - Nếu dữ liệu đầu vào không hợp lệ (ví dụ: ID không khớp, `memberId` hoặc `familyId` trống).
+    *   `401 Unauthorized` - Nếu không có token JWT hoặc token không hợp lệ.
+    *   `403 Forbidden` - Nếu người dùng không có quyền quản lý gia đình.
+    *   `404 Not Found` - Nếu `memberId` không tồn tại, hoặc một trong các ID mối quan hệ (cha/mẹ/vợ/chồng) được cung cấp không tồn tại.
+    *   `500 Internal Server Error` - Lỗi không mong muốn từ phía máy chủ.
+
+Ví dụ Postman:
+
+*   Method: `PUT`
+*   URL: `{{base_url}}/api/member/0b1a2b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c/relationships`
+    *   (Thay `{{base_url}}` bằng URL API của bạn, ví dụ: `http://localhost:8080`)
+    *   (Thay `0b1a2b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c` bằng `Guid` thực tế của thành viên)
+*   Headers:
+    *   `Content-Type: application/json`
+    *   `Authorization: Bearer <your_jwt_token>`
+*   Body (raw, JSON):
+    ```json
+    {
+      "memberId": "0b1a2b3c-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+      "familyId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "fatherId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c7e", // Cập nhật cha
+      "motherId": null,                                   // Xóa mẹ
+      "husbandId": null,
+      "wifeId": "2a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c8f"    // Cập nhật vợ
+    }
+    ```
