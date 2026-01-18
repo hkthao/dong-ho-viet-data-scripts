@@ -189,21 +189,21 @@ def extract_progenitor(html: str) -> dict:
     """Extracts progenitor data from thuy_to.html (HTML 2)."""
     soup = BeautifulSoup(html, "html.parser")
 
-    content_div = soup.find("div", align="justify")
-    if not content_div:
+    main_content_td = soup.find('td', attrs={
+        'valign': 'top',
+        'background': re.compile(r'.*images/bg\.jpeg$'),
+        'height': '100%'
+    })
+
+    if not main_content_td:
         return {}
 
-    raw_text = content_div.get_text(separator='\n\n', strip=True)
+    raw_text = main_content_td.get_text(separator='\n\n', strip=True)
     full_text = raw_text.replace("\xa0", " ")
 
     result = {}
     result["genealogyRecord"] = full_text
-
-    # PROGENITOR NAME
-    # Adjusted regex to capture full Vietnamese names including diacritics
-    m = re.search(r"(?:CỤ TỔ|THƯỢNG TỔ|ÔNG:)\s+([A-ZĐÁÀẢẠÃĂẮẰẲẶẪÂẤẦẨẬẪÈÉẺẸẼÊẾỀỂỆỄÌÍỈỊĨÒÓỎỌÕÔỐỒỔỘỖƠỚỜỞỢỠÙÚỦỤŨƯỨỪỬỰỮỲÝỶỴỸa-zđáàảạãăắằẳặẫâấầẩậẫèéẻẹẽêếềểệễìíỉịĩòóỏọõôốồổộỗơớờởợỡùúủụũưứừửựữỳýỷỵỹ\s]+)", full_text, re.IGNORECASE)
-    if m:
-        result["progenitorName"] = clean_text(m.group(1))
+    result["progenitorName"] = full_text
 
     return result
 
@@ -216,10 +216,9 @@ def extract_phaky(html: str) -> dict:
     main_content_td = soup.find('td', {'valign': 'top', 'background': True, 'height': '100%'})
     
     if main_content_td:
-        # Inside this <td>, find the <div> with align="justify"
-        justify_div = main_content_td.find('div', align='justify')
-        if justify_div:
-            result["genealogyRecord"] = clean_text(justify_div.get_text())
+        raw_text = main_content_td.get_text(separator='\n\n', strip=True)
+        cleaned_text = raw_text.replace("\xa0", " ")
+        result["genealogyRecord"] = cleaned_text
 
     return result
 def extract_tocuoc(html: str) -> dict:
@@ -231,8 +230,16 @@ def extract_tocuoc(html: str) -> dict:
     main_content_td = soup.find('td', {'valign': 'top', 'background': True, 'height': '100%'})
 
     if main_content_td:
-        raw_text = main_content_td.get_text(separator='\n\n', strip=True)
-        # Replace non-breaking spaces specifically
+        # Find the div that contains the actual "Tộc Ước" content
+        # This targets the actual content block
+        justify_div = main_content_td.find('div', align='justify')
+        
+        if justify_div:
+            raw_text = justify_div.get_text(separator='\n\n', strip=True)
+        else:
+            # Fallback to extracting from the main_content_td if the specific div is not found
+            raw_text = main_content_td.get_text(separator='\n\n', strip=True)
+
         cleaned_text = raw_text.replace("\xa0", " ")
         result["familyCovenant"] = cleaned_text
 
@@ -264,14 +271,20 @@ def build_schema(overview: dict, progenitor: dict, phaky: dict, tocuoc: dict, fo
     return final_output
 
 if __name__ == "__main__":
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(current_dir, "../../../../"))
+
+    folder_to_process = "1"
+    base_raw_html_path = os.path.join(project_root, f"dong-ho-viet-data-scripts/output/{folder_to_process}/raw_html")
+
     sample_files_map = {
-        "giapha": "vietnamgiapha/sample/family/giapha.html",
-        "thuy_to": "vietnamgiapha/sample/thuy_to.html",
-        "pha_ky_gia_su": "vietnamgiapha/sample/pha_ky_gia_su.html",
-        "toc_uoc": "vietnamgiapha/sample/toc_uoc.html",
+        "giapha": os.path.join(base_raw_html_path, "giapha.html"),
+        "thuy_to": os.path.join(base_raw_html_path, "thuy_to.html"),
+        "pha_ky_gia_su": os.path.join(base_raw_html_path, "pha_ky_gia_su.html"),
+        "toc_uoc": os.path.join(base_raw_html_path, "toc_uoc.html"),
     }
     
-    output_dir = "output_json_family"
+    output_dir = os.path.join(project_root, "dong-ho-viet-data-scripts/output_json_family")
     os.makedirs(output_dir, exist_ok=True)
 
     giapha_html_content = ""
@@ -279,21 +292,29 @@ if __name__ == "__main__":
     phaky_html_content = ""
     tocuoc_html_content = ""
 
-    if "giapha" in sample_files_map:
+    if "giapha" in sample_files_map and os.path.exists(sample_files_map["giapha"]):
         with open(sample_files_map["giapha"], "r", encoding="utf-8") as f:
             giapha_html_content = f.read()
+    else:
+        print(f"Warning: {sample_files_map.get('giapha')} not found.")
     
-    if "thuy_to" in sample_files_map:
+    if "thuy_to" in sample_files_map and os.path.exists(sample_files_map["thuy_to"]):
         with open(sample_files_map["thuy_to"], "r", encoding="utf-8") as f:
             thuy_to_html_content = f.read()
+    else:
+        print(f"Warning: {sample_files_map.get('thuy_to')} not found.")
 
-    if "pha_ky_gia_su" in sample_files_map:
+    if "pha_ky_gia_su" in sample_files_map and os.path.exists(sample_files_map["pha_ky_gia_su"]):
         with open(sample_files_map["pha_ky_gia_su"], "r", encoding="utf-8") as f:
             phaky_html_content = f.read()
+    else:
+        print(f"Warning: {sample_files_map.get('pha_ky_gia_su')} not found.")
             
-    if "toc_uoc" in sample_files_map:
+    if "toc_uoc" in sample_files_map and os.path.exists(sample_files_map["toc_uoc"]):
         with open(sample_files_map["toc_uoc"], "r", encoding="utf-8") as f:
             tocuoc_html_content = f.read()
+    else:
+        print(f"Warning: {sample_files_map.get('toc_uoc')} not found.")
 
 
     overview_data = extract_overview(giapha_html_content)
@@ -301,11 +322,12 @@ if __name__ == "__main__":
     phaky_data = extract_phaky(phaky_html_content)
     tocuoc_data = extract_tocuoc(tocuoc_html_content)
     
-    final_family_data = build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data, "sample")
+    final_family_data = build_schema(overview_data, progenitor_data, phaky_data, tocuoc_data, folder_to_process)
 
     output_json_path = os.path.join(output_dir, "family_data.json")
     with open(output_json_path, "w", encoding="utf-8") as json_f:
         json.dump(final_family_data, json_f, ensure_ascii=False, indent=2)
-    print(f"Combined family data written to {output_json_path}")
+    print(f"Combined family data for folder '{folder_to_process}' written to {output_json_path}")
     print("-" * 30)
+
 
