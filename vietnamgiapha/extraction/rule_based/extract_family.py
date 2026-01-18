@@ -15,7 +15,7 @@ FINAL_OUTPUT_SCHEMA = {
   "contactInfo": "",
   "otherInfo": "",
   "avatarBase64": "",
-  "visibility": "Private",
+  "visibility": "Public",
   "managerIds": [],
   "viewerIds": [],
   "locationId": ""
@@ -191,7 +191,7 @@ def extract_progenitor(html: str) -> dict:
 
     main_content_td = soup.find('td', attrs={
         'valign': 'top',
-        'background': re.compile(r'.*images/bg\.jpeg$'),
+        'background': 'https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg',
         'height': '100%'
     })
 
@@ -202,7 +202,6 @@ def extract_progenitor(html: str) -> dict:
     full_text = raw_text.replace("\xa0", " ")
 
     result = {}
-    result["genealogyRecord"] = full_text
     result["progenitorName"] = full_text
 
     return result
@@ -213,7 +212,7 @@ def extract_phaky(html: str) -> dict:
     result = {}
 
     # Find the main content <td> using the background and height attributes
-    main_content_td = soup.find('td', {'valign': 'top', 'background': True, 'height': '100%'})
+    main_content_td = soup.find('td', {'valign': 'top', 'background': 'https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg', 'height': '100%'})
     
     if main_content_td:
         raw_text = main_content_td.get_text(separator='\n\n', strip=True)
@@ -227,7 +226,7 @@ def extract_tocuoc(html: str) -> dict:
     result = {}
 
     # Find the main content <td> using the background and height attributes
-    main_content_td = soup.find('td', {'valign': 'top', 'background': True, 'height': '100%'})
+    main_content_td = soup.find('td', {'valign': 'top', 'background': 'https://vietnamgiapha.com/giapha_tml/oldbook//images/bg.jpeg', 'height': '100%'})
 
     if main_content_td:
         # Find the div that contains the actual "Tộc Ước" content

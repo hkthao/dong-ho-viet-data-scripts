@@ -7,13 +7,13 @@ from typing import Optional
 import dotenv
 
 # Load environment variables from .env file
-dotenv.load_dotenv()
+dotenv.load_dotenv(override=True)
 
 # Cấu hình logging
 logger = logging.getLogger(__name__)
 
 # Cấu hình API
-BASE_URL = "http://localhost:8080/api" # Thay đổi nếu API của bạn chạy ở địa chỉ khác
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8080/api") # Lấy từ biến môi trường, mặc định là localhost
 AUTH_TOKEN = os.getenv("AUTH_TOKEN", "") # Lấy từ biến môi trường, mặc định là chuỗi rỗng
 
 HEADERS = {
@@ -99,6 +99,48 @@ def create_family_api_call(family_payload: dict) -> Optional[str]:
     except requests.exceptions.RequestException as req_err:
         logger.error(f"Lỗi kết nối khi gọi API tạo gia đình '{family_name}' ({family_code}): {req_err}")
         return None
+
+def update_family_api_call(family_id: str, family_payload: dict) -> bool:
+    """
+    Cập nhật thông tin gia đình thông qua API.
+    Trả về True nếu thành công, ngược lại trả về False.
+    """
+    family_code = family_payload.get("code")
+    family_name = family_payload.get("name")
+    logger.info(f"Đang gọi API cập nhật gia đình '{family_name}' (ID: {family_id}, mã: {family_code})")
+
+    try:
+        response = requests.put(f"{BASE_URL}/family/{family_id}", headers=HEADERS, json=family_payload)
+        response.raise_for_status()
+
+        if response.status_code == 204: # 204 No Content thường được trả về cho PUT/PATCH thành công
+            logger.info(f"Cập nhật gia đình '{family_name}' (ID: {family_id}) thành công (204 No Content).")
+            return True
+        else:
+            # API có thể trả về 200 OK với một đối tượng thành công
+            try:
+                result = response.json()
+                if result.get("succeeded"):
+                    logger.info(f"Cập nhật gia đình '{family_name}' (ID: {family_id}) thành công.")
+                    return True
+                else:
+                    error_details = result.get('errors') or result.get('detail') or result
+                    logger.error(f"Cập nhật gia đình '{family_name}' (ID: {family_id}) thất bại: {error_details}. Phản hồi thô: {response.text}")
+                    return False
+            except json.JSONDecodeError:
+                # Nếu không phải JSON, nhưng mã trạng thái là 2xx, vẫn coi là thành công
+                if response.status_code >= 200 and response.status_code < 300:
+                    logger.info(f"Cập nhật gia đình '{family_name}' (ID: {family_id}) thành công (không có JSON phản hồi).")
+                    return True
+                else:
+                    logger.error(f"Phản hồi API không phải JSON hợp lệ khi cập nhật gia đình '{family_name}' (ID: {family_id}): {response.text}")
+                    return False
+    except requests.exceptions.HTTPError as http_err:
+        logger.error(f"Lỗi HTTP khi gọi API cập nhật gia đình '{family_name}' (ID: {family_id}): {http_err}. Phản hồi: {response.text}")
+        return False
+    except requests.exceptions.RequestException as req_err:
+        logger.error(f"Lỗi kết nối khi gọi API cập nhật gia đình '{family_name}' (ID: {family_id}): {req_err}")
+        return False
 
 def get_member_by_code(family_id: str, member_code: str) -> Optional[str]:
     """

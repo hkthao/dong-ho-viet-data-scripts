@@ -66,25 +66,33 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
         # Bước 1 & 2: Tạo hoặc lấy Family ID
         family_code = f"GPVN-{folder_name}"
         existing_family_id = api_services.get_family_by_code(family_code)
+        logger.debug(f"Kết quả kiểm tra gia đình hiện có cho mã '{family_code}': ID = {existing_family_id}")
         
+        family_id = None
+        family_payload = {
+            "name": family_name,
+            "code": family_code,
+            "description": family_data.get("description"),
+            "address": family_data.get("address"),
+            "visibility": family_data.get("visibility", "Public"),
+            "genealogyRecord": family_data.get("genealogyRecord"),
+            "progenitorName": family_data.get("progenitorName"),
+            "familyCovenant": family_data.get("familyCovenant"),
+            "contactInfo": family_data.get("contactInfo")
+        }
+
         if existing_family_id:
             family_id = existing_family_id
-            logger.info(f"Gia đình '{family_code}' đã tồn tại, ID: {family_id}")
+            logger.info(f"Gia đình '{family_code}' đã tồn tại, ID: {family_id}. Đang cập nhật thông tin.")
+            family_payload["id"] = family_id # Add the ID to the payload for update
+            if not api_services.update_family_api_call(family_id, family_payload):
+                logger.error(f"Không thể cập nhật thông tin cho gia đình '{family_code}'. Bỏ qua.")
+                continue
         else:
-            family_payload = {
-                "name": family_name,
-                "code": family_code,
-                "description": family_data.get("description"),
-                "address": family_data.get("address"),
-                "visibility": family_data.get("visibility", "Public"),
-                "genealogyRecord": family_data.get("genealogyRecord"),
-                "progenitorName": family_data.get("progenitorName"),
-                "familyCovenant": family_data.get("familyCovenant"),
-                "contactInfo": family_data.get("contactInfo")
-            }
             family_id = api_services.create_family_api_call(family_payload)
         
         if not family_id:
+            logger.error(f"Không thể tạo hoặc cập nhật gia đình '{family_code}'. Bỏ qua.")
             continue
 
         # --- Xử lý thành viên ---
