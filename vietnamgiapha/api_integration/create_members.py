@@ -76,7 +76,11 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
                 "code": family_code,
                 "description": family_data.get("description"),
                 "address": family_data.get("address"),
-                "visibility": family_data.get("visibility", "Private")
+                "visibility": family_data.get("visibility", "Public"),
+                "genealogyRecord": family_data.get("genealogyRecord"),
+                "progenitorName": family_data.get("progenitorName"),
+                "familyCovenant": family_data.get("familyCovenant"),
+                "contactInfo": family_data.get("contactInfo")
             }
             family_id = api_services.create_family_api_call(family_payload)
         

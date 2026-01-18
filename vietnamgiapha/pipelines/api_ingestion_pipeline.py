@@ -3,6 +3,7 @@ import subprocess
 import logging
 import argparse
 import os
+import sys
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,7 +15,7 @@ def run_script(script_path: str, args: list = None):
     if args is None:
         args = []
     
-    command = ["python3", "-m", script_path] + args # Sử dụng python3 -m và truyền đường dẫn module trực tiếp
+    command = [sys.executable, "-m", script_path] + args # Sử dụng sys.executable
     
     # Thiết lập PYTHONPATH cho subprocess
     current_script_dir = os.path.dirname(os.path.abspath(__file__))

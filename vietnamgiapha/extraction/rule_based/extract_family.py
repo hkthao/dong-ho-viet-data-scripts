@@ -193,14 +193,15 @@ def extract_progenitor(html: str) -> dict:
     if not content_div:
         return {}
 
-    full_text = clean_text(content_div.get_text("\n"))
+    raw_text = content_div.get_text(separator='\n\n', strip=True)
+    full_text = raw_text.replace("\xa0", " ")
 
     result = {}
     result["genealogyRecord"] = full_text
 
     # PROGENITOR NAME
     # Adjusted regex to capture full Vietnamese names including diacritics
-    m = re.search(r"CỤ TỔ\s+([A-ZĐÁÀẢẠÃĂẮẰẲẶẪÂẤẦẨẬẪÈÉẺẸẼÊẾỀỂỆỄÌÍỈỊĨÒÓỎỌÕÔỐỒỔỘỖƠỚỜỞỢỠÙÚỦỤŨƯỨỪỬỰỮỲÝỶỴỸ\s]+)", full_text)
+    m = re.search(r"(?:CỤ TỔ|THƯỢNG TỔ|ÔNG:)\s+([A-ZĐÁÀẢẠÃĂẮẰẲẶẪÂẤẦẨẬẪÈÉẺẸẼÊẾỀỂỆỄÌÍỈỊĨÒÓỎỌÕÔỐỒỔỘỖƠỚỜỞỢỠÙÚỦỤŨƯỨỪỬỰỮỲÝỶỴỸa-zđáàảạãăắằẳặẫâấầẩậẫèéẻẹẽêếềểệễìíỉịĩòóỏọõôốồổộỗơớờởợỡùúủụũưứừửựữỳýỷỵỹ\s]+)", full_text, re.IGNORECASE)
     if m:
         result["progenitorName"] = clean_text(m.group(1))
 
@@ -230,18 +231,10 @@ def extract_tocuoc(html: str) -> dict:
     main_content_td = soup.find('td', {'valign': 'top', 'background': True, 'height': '100%'})
 
     if main_content_td:
-        # Check if "TỘC ƯỚC - GIA PHÁP" heading exists within this main content block
-        heading_td = main_content_td.find('td', string=re.compile(r"TỘC ƯỚC - GIA PHÁP"))
-        if heading_td:
-            # Inside the same main content block, find the div with align="justify"
-            justify_div = main_content_td.find('div', align='justify')
-            if justify_div:
-                family_covenant_text = []
-                for element in justify_div.find_all(['p', 'span']):
-                    if element.name == 'p' and element.get_text(strip=True) == '':
-                        continue
-                    family_covenant_text.append(element.get_text())
-                result["familyCovenant"] = clean_text(" ".join(family_covenant_text))
+        raw_text = main_content_td.get_text(separator='\n\n', strip=True)
+        # Replace non-breaking spaces specifically
+        cleaned_text = raw_text.replace("\xa0", " ")
+        result["familyCovenant"] = cleaned_text
 
     return result
 

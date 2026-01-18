@@ -106,8 +106,12 @@ def main(target_folder: Optional[str] = None):
                         if father_code and father_code.strip() != "" and father_code != "null":
                             father_api_id = get_member_id_by_code(father_code)
                             if father_api_id:
-                                update_payload["fatherId"] = father_api_id
-                                processed_member_data["fatherId"] = father_api_id # Store in processed data
+                                if father_api_id == member_api_id:
+                                    logger.warning(f"Cha của thành viên '{member_code}' có ID trùng với chính thành viên đó. Đặt fatherId là None.")
+                                    update_payload["fatherId"] = None
+                                else:
+                                    update_payload["fatherId"] = father_api_id
+                                    processed_member_data["fatherId"] = father_api_id # Store in processed data
                             else:
                                 logger.warning(f"Không tìm thấy API ID cho cha có mã '{father_code}' của thành viên '{member_code}'.")
                         
@@ -135,8 +139,12 @@ def main(target_folder: Optional[str] = None):
                         if mother_code and mother_code.strip() != "" and mother_code != "null":
                             mother_api_id = get_member_id_by_code(mother_code)
                             if mother_api_id:
-                                update_payload["motherId"] = mother_api_id
-                                processed_member_data["motherId"] = mother_api_id # Store in processed data
+                                if mother_api_id == member_api_id:
+                                    logger.warning(f"Mẹ của thành viên '{member_code}' có ID trùng với chính thành viên đó. Đặt motherId là None.")
+                                    update_payload["motherId"] = None
+                                else:
+                                    update_payload["motherId"] = mother_api_id
+                                    processed_member_data["motherId"] = mother_api_id # Store in processed data
                             else:
                                 logger.warning(f"Không tìm thấy API ID cho mẹ có mã '{mother_code}' của thành viên '{member_code}'.")
 
@@ -197,24 +205,32 @@ def main(target_folder: Optional[str] = None):
                         
                         # Apply resolved IDs to update_payload
                         if resolved_wife_api_id:
-                            update_payload["wifeId"] = resolved_wife_api_id
-                            processed_member_data["wifeId"] = resolved_wife_api_id
-                            # Queue reverse update for the wife
-                            pending_reverse_updates.append({
-                                "member_api_id": resolved_wife_api_id,
-                                "family_api_id": current_family_api_id,
-                                "update_payload": {"husbandId": member_api_id}
-                            })
+                            if resolved_wife_api_id == member_api_id:
+                                logger.warning(f"Vợ của thành viên '{member_code}' có ID trùng với chính thành viên đó. Đặt wifeId là None.")
+                                update_payload["wifeId"] = None
+                            else:
+                                update_payload["wifeId"] = resolved_wife_api_id
+                                processed_member_data["wifeId"] = resolved_wife_api_id
+                                # Queue reverse update for the wife
+                                pending_reverse_updates.append({
+                                    "member_api_id": resolved_wife_api_id,
+                                    "family_api_id": current_family_api_id,
+                                    "update_payload": {"husbandId": member_api_id}
+                                })
                         
                         if resolved_husband_api_id:
-                            update_payload["husbandId"] = resolved_husband_api_id
-                            processed_member_data["husbandId"] = resolved_husband_api_id
-                            # Queue reverse update for the husband
-                            pending_reverse_updates.append({
-                                "member_api_id": resolved_husband_api_id,
-                                "family_api_id": current_family_api_id,
-                                "update_payload": {"wifeId": member_api_id}
-                            })
+                            if resolved_husband_api_id == member_api_id:
+                                logger.warning(f"Chồng của thành viên '{member_code}' có ID trùng với chính thành viên đó. Đặt husbandId là None.")
+                                update_payload["husbandId"] = None
+                            else:
+                                update_payload["husbandId"] = resolved_husband_api_id
+                                processed_member_data["husbandId"] = resolved_husband_api_id
+                                # Queue reverse update for the husband
+                                pending_reverse_updates.append({
+                                    "member_api_id": resolved_husband_api_id,
+                                    "family_api_id": current_family_api_id,
+                                    "update_payload": {"wifeId": member_api_id}
+                                })
                         
                         if update_payload:
                             if api_services.update_member_relationships(member_api_id, current_family_api_id, update_payload):
