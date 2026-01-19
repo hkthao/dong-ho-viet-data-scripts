@@ -1,0 +1,33 @@
+# Postman API Description for Fix Family Relationships
+
+## Endpoint: Fix Family Relationships
+
+Sửa lỗi quan hệ trong gia đình (ví dụ: hoán đổi Father/Mother nếu giới tính sai, suy luận cha/mẹ từ vợ/chồng) cho một gia đình cụ thể.
+
+-   **Method:** `POST`
+-   **URL:** `{{backend_base_url}}/api/family/{familyId}/fix-relationships`
+
+### Path Parameters:
+
+-   `familyId` (Guid, required): ID của gia đình cần sửa lỗi quan hệ.
+
+### Request Body:
+
+-   Không yêu cầu request body.
+
+### Example Request (using a variable for base URL):
+
+```http
+POST {{backend_base_url}}/api/family/{{family_id}}/fix-relationships
+```
+
+### Example Response (Success):
+
+-   **Status Code:** `204 No Content`
+-   **Body:** (Empty)
+
+### Notes:
+
+-   `{{backend_base_url}}` là một biến Postman chứa URL cơ sở của backend API của bạn (ví dụ: `http://localhost:8080`).
+-   `{{family_id}}` là một biến Postman chứa ID của gia đình mà bạn muốn sửa lỗi.
+-   Endpoint này sẽ thực hiện các điều chỉnh quan hệ tự động dựa trên giới tính và thông tin vợ/chồng.

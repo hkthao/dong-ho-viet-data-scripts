@@ -142,6 +142,57 @@ def update_family_api_call(family_id: str, family_payload: dict) -> bool:
         logger.error(f"Lỗi kết nối khi gọi API cập nhật gia đình '{family_name}' (ID: {family_id}): {req_err}")
         return False
 
+def fix_family_relationships_api_call(family_id: str) -> bool:
+    """
+    Sửa lỗi quan hệ trong gia đình thông qua API.
+    Trả về True nếu thành công, ngược lại trả về False.
+    """
+    logger.info(f"Đang gọi API sửa lỗi quan hệ cho gia đình ID: {family_id}")
+    try:
+        response = requests.post(f"{BASE_URL}/family/{family_id}/fix-relationships", headers=HEADERS)
+        response.raise_for_status() # Ném lỗi cho các mã trạng thái HTTP xấu (4xx hoặc 5xx)
+
+        if response.status_code == 204:
+            logger.info(f"Sửa lỗi quan hệ cho gia đình ID: {family_id} thành công (204 No Content).")
+            return True
+        elif response.status_code == 200: # Some APIs might return 200 with success message
+            logger.info(f"Sửa lỗi quan hệ cho gia đình ID: {family_id} thành công (200 OK).")
+            return True
+        else:
+            logger.error(f"Sửa lỗi quan hệ cho gia đình ID: {family_id} thất bại: {response.status_code} - {response.text}")
+            return False
+    except requests.exceptions.HTTPError as http_err:
+        logger.error(f"Lỗi HTTP khi gọi API sửa lỗi quan hệ cho gia đình ID: {family_id}: {http_err}. Phản hồi: {response.text}")
+        return False
+    except requests.exceptions.RequestException as req_err:
+        logger.error(f"Lỗi kết nối khi gọi API sửa lỗi quan hệ cho gia đình ID: {family_id}: {req_err}")
+        return False
+
+def recalculate_family_stats_api_call(family_id: str) -> bool:
+    """
+    Tính toán lại thống kê gia đình thông qua API.
+    Trả về True nếu thành công, ngược lại trả về False.
+    """
+    logger.info(f"Đang gọi API tính toán lại thống kê cho gia đình ID: {family_id}")
+    try:
+        response = requests.post(f"{BASE_URL}/family/{family_id}/recalculate-stats", headers=HEADERS)
+        response.raise_for_status() # Ném lỗi cho các mã trạng thái HTTP xấu (4xx hoặc 5xx)
+
+        if response.status_code == 200: # Expected 200 OK for success
+            logger.info(f"Tính toán lại thống kê cho gia đình ID: {family_id} thành công (200 OK).")
+            # Optionally parse response for updated stats if needed, but for now, just success confirmation
+            return True
+        else:
+            logger.error(f"Tính toán lại thống kê cho gia đình ID: {family_id} thất bại: {response.status_code} - {response.text}")
+            return False
+    except requests.exceptions.HTTPError as http_err:
+        logger.error(f"Lỗi HTTP khi gọi API tính toán lại thống kê cho gia đình ID: {family_id}: {http_err}. Phản hồi: {response.text}")
+        return False
+    except requests.exceptions.RequestException as req_err:
+        logger.error(f"Lỗi kết nối khi gọi API tính toán lại thống kê cho gia đình ID: {family_id}: {req_err}")
+        return False
+
+
 def get_member_by_code(family_id: str, member_code: str) -> Optional[str]:
     """
     Kiểm tra xem thành viên có tồn tại không và trả về Member ID nếu có.

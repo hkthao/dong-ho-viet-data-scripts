@@ -1,0 +1,42 @@
+# Postman API Description for Recalculate Family Stats
+
+## Endpoint: Recalculate Family Stats
+
+Xử lý POST request để tính toán lại tổng số thành viên và tổng số thế hệ cho một gia đình cụ thể. Endpoint này cập nhật các thống kê liên quan đến số lượng thành viên và cấu trúc thế hệ của gia đình.
+
+-   **Method:** `POST`
+-   **URL:** `{{backend_base_url}}/api/family/{familyId}/recalculate-stats`
+
+### Path Parameters:
+
+-   `familyId` (Guid, required): ID của gia đình cần tính toán lại thống kê.
+
+### Request Body:
+
+-   Không yêu cầu request body.
+
+### Example Request (using a variable for base URL):
+
+```http
+POST {{backend_base_url}}/api/family/{{family_id}}/recalculate-stats
+```
+
+### Example Response (Success):
+
+-   **Status Code:** `200 OK`
+-   **Body:** (Có thể trả về đối tượng FamilyDto đã được cập nhật hoặc một đối tượng thống kê tương tự)
+    ```json
+    {
+        "id": "guid-of-family",
+        "name": "Tên gia đình",
+        "totalMembers": 123,
+        "totalGenerations": 5,
+        // ... các trường thông tin gia đình khác
+    }
+    ```
+
+### Notes:
+
+-   `{{backend_base_url}}` là một biến Postman chứa URL cơ sở của backend API của bạn (ví dụ: `http://localhost:8080`).
+-   `{{family_id}}` là một biến Postman chứa ID của gia đình mà bạn muốn tính toán lại thống kê.
+-   Endpoint này sẽ tự động cập nhật các trường thống kê của gia đình trong cơ sở dữ liệu.
