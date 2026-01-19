@@ -187,6 +187,19 @@ def main(target_folder: Optional[str] = None, member_limit: int = 0):
             if created_id:
                 member_code_to_id_map[member_code] = created_id
                 member_count += 1
+        
+        # Sau khi xử lý tất cả thành viên, gọi API sửa lỗi quan hệ và tính toán lại thống kê
+        logger.info(f"Hoàn tất xử lý thành viên cho gia đình '{family_code}'. Đang gọi API sửa lỗi quan hệ và tính toán lại thống kê.")
+        
+        if api_services.fix_family_relationships_api_call(family_id):
+            logger.info(f"API sửa lỗi quan hệ cho gia đình '{family_code}' đã gọi thành công.")
+        else:
+            logger.error(f"API sửa lỗi quan hệ cho gia đình '{family_code}' thất bại.")
+
+        if api_services.recalculate_family_stats_api_call(family_id):
+            logger.info(f"API tính toán lại thống kê cho gia đình '{family_code}' đã gọi thành công.")
+        else:
+            logger.error(f"API tính toán lại thống kê cho gia đình '{family_code}' thất bại.")
 
     logger.info("Hoàn tất quá trình.")
 
